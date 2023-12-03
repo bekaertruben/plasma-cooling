@@ -20,7 +20,7 @@ Recap of discretization: the fields are discretized in space and static, the par
 
 ## Boris scheme
 
-Follow [(Ripperda et al 2018)](doi.org/10.3847/1538-4365/aab114).
+Follow [(Ripperda et al 2018)](https://doi.org/10.3847/1538-4365/aab114).
 The aim is to apply the Boris pusher first, and then apply a drag force.
 
 ## Radiative cooling
