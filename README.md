@@ -1,5 +1,5 @@
 $$
-\newcommand{\dd}{\text{d}}
+\newcommand{\dd}{\mathrm{d}}
 \newcommand{\abs}[1]{|#1|}
 $$
 
@@ -19,6 +19,9 @@ Stability is rediscussed in Section 6.10, and how this plays in with conservatio
 Recap of discretization: the fields are discretized in space and static, the particles are discretized in time and not in space, which means that at every point in time the fields will have to be interpolated with a `scipy` implementation to get $\vec{E}(\vec{x}_n)$.
 
 ## Boris scheme
+
+Follow [(Ripperda et al 2018)](doi.org/10.3847/1538-4365/aab114).
+The aim is to apply the Boris pusher first, and then apply a drag force.
 
 ## Radiative cooling
 
