@@ -14,12 +14,14 @@ bx = np.array(f["/bx"], dtype=prec).T
 by = np.array(f["/by"], dtype=prec).T
 bz = np.array(f["/bz"], dtype=prec).T
 f.close()
+
 (nx, ny, nz) = ex.shape    # the number of grid points in x, y, z
+
 
 #
 # Some notes and tips:
 #
-# 
+#
 # The simulation domain is a cube with nx = ny = nz.
 # The boundary conditions are periodic in all 3 directions! Particle motion needs
 # to take this into account.
@@ -31,7 +33,7 @@ f.close()
 # was written to the "flds.tot.00410" file.
 #
 # For consistency it is best to adopt the normalizations and units of Tristan-MP.
-# Check the code's wiki page and code on github for a convenient normalization of 
+# Check the code's wiki page and code on github for a convenient normalization of
 # the radiative drag force and the definition of the "cool_gamma_syn" and "cool_gamma_ic"
 # parameters that quantify the strength of synchrotron and inverse-Compton
 # cooling, respectively. For that part, you do need to know the value of "Bnorm".
@@ -67,12 +69,3 @@ z = np.random.rand(N) * nz
 ex0 = ndimage.map_coordinates(ex, [x, y, z], order=1)
 ey0 = ndimage.map_coordinates(ey, [x, y, z], order=1)
 ez0 = ndimage.map_coordinates(ez, [x, y, z], order=1)
-
-
-
-
-
-
-
-
-
