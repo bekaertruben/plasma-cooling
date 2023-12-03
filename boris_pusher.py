@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.ndimage import map_coordinates
+from matplotlib import figure
 
 
 def apply_periodicity(X0: np.ndarray, edges: np.ndarray):
@@ -10,7 +11,7 @@ def apply_periodicity(X0: np.ndarray, edges: np.ndarray):
         assumes boundaries of [(0,edge) for edge in edges]
     """
 
-    return np.mod(X0, edges)
+    return np.mod(X0, edges[:, np.newaxis])
 
 
 def interpolate_field(x0: np.ndarray, F: np.ndarray):
@@ -63,10 +64,79 @@ def boris_push(x0: np.ndarray, u0: np.ndarray, fields: dict, dt: float, q_over_m
     s = 2*t / (1 + np.linalg.norm(t)**2)
 
     uplus = umin + \
-        np.cross((umin + np.cross(umin, t, axisa=0, axisb=0)),
-                 s, axisa=0, axisb=0)
+        np.cross((umin + np.cross(umin, t, axisa=0, axisb=0, axisc=0)),
+                 s, axisa=0, axisb=0, axisc=0)
 
     unext = uplus + q_over_m * dt * Eci / 2
     xnext = xci + unext * dt / (2 * g)
 
+    edges = np.asarray(fields["ex"].shape)
+
+    xnext = apply_periodicity(xnext, edges)
+
     return xnext, unext
+
+
+def load_fields(path: str = "data/flds.tot.00410"):
+    import h5py
+    prec = "float32"
+    f = h5py.File(path, 'r')
+    ex = np.array(f["/ex"], dtype=prec).T
+    ey = np.array(f["/ey"], dtype=prec).T
+    ez = np.array(f["/ez"], dtype=prec).T
+    bx = np.array(f["/bx"], dtype=prec).T
+    by = np.array(f["/by"], dtype=prec).T
+    bz = np.array(f["/bz"], dtype=prec).T
+    f.close()
+
+    fields = {
+        "ex": ex,
+        "ey": ey,
+        "ez": ez,
+        "bx": bx,
+        "by": by,
+        "bz": bz
+    }
+
+    return fields
+
+
+def main():
+    from tqdm import tqdm
+    CC = 0.45
+    DX = 1
+
+    DT = DX / CC
+    Q_OVER_M = -1
+
+    fields = load_fields()
+    edges = np.asarray(fields["ex"].shape)
+
+    IT = int(2e3)
+    N = 1
+    x = np.random.rand(3, N) * edges[:, np.newaxis]
+    u = np.random.rand(3, N)
+
+    x_history = []
+    y_history = []
+    z_history = []
+
+    for _ in tqdm(range(IT)):
+        x, u = boris_push(x, u, fields, DT, Q_OVER_M)
+
+        x_history.append(x[0])
+        y_history.append(x[1])
+        z_history.append(x[2])
+
+    fig = figure.Figure(figsize=(4, 3.5))
+    ax = fig.add_subplot(projection="3d")
+
+    for i in range(N):
+        ax.scatter(np.asarray(x_history)[:, i], np.asarray(y_history)[:, i], np.asarray(z_history)[:, i],
+                   c=np.arange(IT), cmap="rainbow", s=.5)
+    # ax.plot(z_history)
+    fig.savefig("images/xytest.png", facecolor="white")
+
+
+if __name__ == '__main__':
+    main()
