@@ -103,19 +103,27 @@ def load_fields(path: str = "data/flds.tot.00410"):
 
 def main():
     from tqdm import tqdm
-    CC = 0.45
-    DX = 1
+    CC = 0.25
+    DT = 1
+    DX = DT / CC
 
-    DT = DX / CC
     Q_OVER_M = -1
 
-    fields = load_fields()
+    # fields = load_fields()
+    fieldnames = ["ex", "ey", "ez", "bx", "by", "bz"]
+    n = 100
+    fields = {key: np.zeros((n, n, n)) for key in fieldnames}
+    fields["bz"] += 2e-3
+    # fields["ex"] += 1
     edges = np.asarray(fields["ex"].shape)
 
-    IT = int(2e3)
+    IT = int(10000*DT)
+    # IT = 5
     N = 1
-    x = np.random.rand(3, N) * edges[:, np.newaxis]
-    u = np.random.rand(3, N)
+    # x = np.random.rand(3, N) * edges[:, np.newaxis]
+    x = np.asarray([[20], [20], [20]])
+    # u = np.random.rand(3, N)
+    u = np.asarray([[0.00005], [0.], [0.001]])
 
     x_history = []
     y_history = []
@@ -134,7 +142,16 @@ def main():
     for i in range(N):
         ax.scatter(np.asarray(x_history)[:, i], np.asarray(y_history)[:, i], np.asarray(z_history)[:, i],
                    c=np.arange(IT), cmap="rainbow", s=.5)
-    # ax.plot(z_history)
+
+    ax.set_xlabel("x")
+    ax.set_ylabel("y")
+    ax.set_zlabel("z")
+
+    # ax.set_xlim([20-0.04, 20+0.04])
+    # ax.set_ylim([20-0.01, 20+0.07])
+    # ax.set_zlim([20, 40])
+    fig.suptitle("purple is early, red is later")
+
     fig.savefig("images/xytest.png", facecolor="white")
 
 
