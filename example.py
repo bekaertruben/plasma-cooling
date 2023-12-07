@@ -61,7 +61,7 @@ N = 50000
 x = np.random.rand(N) * nx
 y = np.random.rand(N) * ny
 z = np.random.rand(N) * nz
-
+print(nx, ny, nz)
 
 # Tip: use map_coordinates() function from scipy to interpolate
 # the E and B fields to the particle positions to find the

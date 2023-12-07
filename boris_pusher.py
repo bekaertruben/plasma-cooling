@@ -2,6 +2,21 @@ import numpy as np
 from scipy.ndimage import map_coordinates
 from matplotlib import figure
 
+# no numerical speed of light because no cell size, set C=1
+C = 3e8  # meter/sec
+CC = 0.45
+BOXSIZE = 1e8  # meter
+# nx = 160 downsampled from 4*160
+DX = BOXSIZE / (4*160)
+DT = CC * DX / C
+T = 5 * BOXSIZE / C  # time to simulate in seconds
+ITERATIONS = int(T/DT)
+EDGES_CELLS = np.array([160, 160, 160])
+EDGES_METER = np.ones(3) * BOXSIZE
+
+
+Q_OVER_M = -1
+
 
 def apply_periodicity(X0: np.ndarray, edges: np.ndarray):
     """
@@ -27,10 +42,10 @@ def lorentz_factor(u: np.ndarray):
     u: (3,N)
     """
 
-    return np.sqrt(1 + np.sum(np.square(u), axis=0))
+    return np.sqrt(1 + np.sum(np.square(u)/C**2, axis=0))
 
 
-def boris_push(x0: np.ndarray, u0: np.ndarray, fields: dict, dt: float, q_over_m: float):
+def boris_push(x0: np.ndarray, u0: np.ndarray, fields: dict):
     """
     Borish Pusher
     -----
@@ -42,7 +57,7 @@ def boris_push(x0: np.ndarray, u0: np.ndarray, fields: dict, dt: float, q_over_m
         keys must include 'ex','ey','ez','bx','by','bz'
     """
 
-    xci = x0 + u0*dt / (2 * lorentz_factor(u0))
+    xci = x0 + u0*DT / (2 * lorentz_factor(u0))
 
     # interpolate fields if bottleneck could make it multiprocessed
     fields_ci = {key: interpolate_field(xci, value)
@@ -51,15 +66,15 @@ def boris_push(x0: np.ndarray, u0: np.ndarray, fields: dict, dt: float, q_over_m
     # fields_ci[key] is a (N,) shaped array
 
     # Fci shape: (3,N)
-    Eci = np.asarray([fields_ci[key] for key in ["ex", "ey", "ez"]])
-    Bci = np.asarray([fields_ci[key] for key in ["bx", "by", "bz"]])
+    Eci = np.array([fields_ci[key] for key in ["ex", "ey", "ez"]])
+    Bci = np.array([fields_ci[key] for key in ["bx", "by", "bz"]])
 
-    umin = u0 + q_over_m * dt * Eci / 2
+    umin = u0 + Q_OVER_M * DT * Eci / 2
 
     # == lorentz_factor(uplus) == lorentz_factor(uci) see paper
     g = lorentz_factor(umin)
 
-    t = Bci * q_over_m * dt / (2 * g)
+    t = Bci * Q_OVER_M * DT / (2 * g)
 
     s = 2*t / (1 + np.linalg.norm(t)**2)
 
@@ -67,12 +82,10 @@ def boris_push(x0: np.ndarray, u0: np.ndarray, fields: dict, dt: float, q_over_m
         np.cross((umin + np.cross(umin, t, axisa=0, axisb=0, axisc=0)),
                  s, axisa=0, axisb=0, axisc=0)
 
-    unext = uplus + q_over_m * dt * Eci / 2
-    xnext = xci + unext * dt / (2 * g)
+    unext = uplus + Q_OVER_M * DT * Eci / 2
+    xnext = xci + unext * DT / (2 * g)
 
-    edges = np.asarray(fields["ex"].shape)
-
-    xnext = apply_periodicity(xnext, edges)
+    xnext = apply_periodicity(xnext, EDGES_METER)
 
     return xnext, unext
 
@@ -103,56 +116,55 @@ def load_fields(path: str = "data/flds.tot.00410"):
 
 def main():
     from tqdm import tqdm
-    CC = 0.25
-    DT = 1
-    DX = DT / CC
 
-    Q_OVER_M = -1
+    fields = load_fields()
 
-    # fields = load_fields()
-    fieldnames = ["ex", "ey", "ez", "bx", "by", "bz"]
-    n = 100
-    fields = {key: np.zeros((n, n, n)) for key in fieldnames}
-    fields["bz"] += 2e-3
+    # fieldnames = ["ex", "ey", "ez", "bx", "by", "bz"]
+    # n = 160
+    # fields = {key: np.zeros((n, n, n)) for key in fieldnames}
+    # fields["bz"] += 200
     # fields["ex"] += 1
-    edges = np.asarray(fields["ex"].shape)
 
-    IT = int(10000*DT)
-    # IT = 5
     N = 1
-    # x = np.random.rand(3, N) * edges[:, np.newaxis]
-    x = np.asarray([[20], [20], [20]])
-    # u = np.random.rand(3, N)
-    u = np.asarray([[0.00005], [0.], [0.001]])
+    x = np.random.rand(3, N) * EDGES_METER[:, np.newaxis]
+    u = np.random.rand(3, N)
+    u /= np.linalg.norm(u, axis=0)
+    u *= (np.random.rand(N) * C)[:, np.newaxis]
+
+    # manual
+    # x = np.asarray([[20], [20], [20]])
+    # u = np.asarray([[1e-7*C], [0.], [1e-5*C]])
 
     x_history = []
     y_history = []
     z_history = []
 
-    for _ in tqdm(range(IT)):
-        x, u = boris_push(x, u, fields, DT, Q_OVER_M)
+    for _ in tqdm(range(ITERATIONS)):
+        x, u = boris_push(x, u, fields)
 
         x_history.append(x[0])
         y_history.append(x[1])
         z_history.append(x[2])
 
+    # fig = plt.figure(figsize=(4, 3.5))
     fig = figure.Figure(figsize=(4, 3.5))
     ax = fig.add_subplot(projection="3d")
 
     for i in range(N):
         ax.scatter(np.asarray(x_history)[:, i], np.asarray(y_history)[:, i], np.asarray(z_history)[:, i],
-                   c=np.arange(IT), cmap="rainbow", s=.5)
+                   c=np.arange(ITERATIONS), cmap="rainbow", s=.5)
 
-    ax.set_xlabel("x")
-    ax.set_ylabel("y")
-    ax.set_zlabel("z")
+    ax.set_xlabel("x [m]")
+    ax.set_ylabel("y [m]")
+    ax.set_zlabel("z [m]")
 
-    # ax.set_xlim([20-0.04, 20+0.04])
-    # ax.set_ylim([20-0.01, 20+0.07])
-    # ax.set_zlim([20, 40])
+    ax.set_xlim([0, BOXSIZE])
+    ax.set_ylim([0, BOXSIZE])
+    ax.set_zlim([0, BOXSIZE])
     fig.suptitle("purple is early, red is later")
 
     fig.savefig("images/xytest.png", facecolor="white")
+    return fig
 
 
 if __name__ == '__main__':
