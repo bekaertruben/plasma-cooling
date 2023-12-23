@@ -46,6 +46,9 @@ def boris_push(x0: np.ndarray, u0: np.ndarray, fields: dict):
     fields: dict
         keys must include 'ex','ey','ez','bx','by','bz'
     """
+    if set(fields.keys()) != set(FIELDNAMES):
+        raise KeyError(
+            f"`fields` keys ({fields.keys()}) does not corresponds with {FIELDNAMES}")
 
     xci = x0 + u0*DT / (2 * lorentz_factor(u0))
 
@@ -69,8 +72,8 @@ def boris_push(x0: np.ndarray, u0: np.ndarray, fields: dict):
     s = 2*t / (1 + np.linalg.norm(t)**2)
 
     uplus = umin + \
-        np.cross((umin + np.cross(umin, t, axisa=0, axisb=0, axisc=0)),
-                 s, axisa=0, axisb=0, axisc=0)
+        np.cross((umin + np.cross(umin, t, axis=0)),
+                 s, axis=0)
 
     unext = uplus + Q_OVER_M * DT * Eci / 2
     xnext = xci + unext * DT / (2 * g)
@@ -109,8 +112,7 @@ def uniform_B(bdir: str = "z", val: Optional[float] = None):
     directions = ["x", "y", "z"]
     if bdir not in directions:
         raise ValueError(f"Direction {bdir} not in {directions}")
-    fieldnames = ["ex", "ey", "ez", "bx", "by", "bz"]
-    fields = {key: np.zeros((N_CELLS, N_CELLS, N_CELLS)) for key in fieldnames}
+    fields = {key: np.zeros((N_CELLS, N_CELLS, N_CELLS)) for key in FIELDNAMES}
     if val is not None:
         fields[f"b{bdir}"] += val
     else:
