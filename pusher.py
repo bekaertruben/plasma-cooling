@@ -121,10 +121,11 @@ def radiate_synchrotron(u0: np.ndarray, u1: np.ndarray, Eci: np.ndarray, Bci: np
 
     Ebar = Eci + np.cross(betaci, Bci, axis=0)
 
-    beta_dot_e = betaci @ Eci
+    # probably a more efficient way with np.einsum but I haven't taken the time to look at it
+    beta_dot_e = np.diag(betaci.T @ Eci)
 
     kappa_R = np.cross(Ebar, Bci, axis=0) + beta_dot_e * Eci
-    chi_R_sq = np.square(np.norm(Ebar, axis=0)) - np.square(beta_dot_e)
+    chi_R_sq = np.square(np.linalg.norm(Ebar, axis=0)) - np.square(beta_dot_e)
 
     prefactor = abs(Q_OVER_M) * Bnorm * BETA_REC / (C * GAMMA_SYN**2)
 
@@ -236,56 +237,50 @@ def kinetic_energy(u_history: list[np.array], mass: float = 1.0):
 
 def main():
 
-    # fields = load_fields()
-    fields = uniform_B()
+    fields, benidorm = load_fields()
 
-    N_PARTICLES = 1
-    # x = init_random_x(N_PARTICLES)
-    # u = init_random_u(N_PARTICLES)
-    # manual
-    x = np.asarray([[5], [5], [5]])*1e7
-
+    N_PARTICLES = 5
+    x = sample_pos_uniform(N_PARTICLES)
     u = sample_velocity_thermal(N_PARTICLES, 5e5)
-    print(u)
-
-    x_history = []
-    y_history = []
-    z_history = []
-
-    u_history = []
-
+#
+    # x_history = []
+    # y_history = []
+    # z_history = []
+#
+    # u_history = []
+#
     for _ in tqdm(range(ITERATIONS)):
-        x, u = boris_push(x, u, fields)
+        x, u = push(x, u, fields, Bnorm=benidorm)
 
-        x_history.append(x[0])
-        y_history.append(x[1])
-        z_history.append(x[2])
-        u_history.append(u)
+        # x_history.append(x[0])
+        # y_history.append(x[1])
+        # z_history.append(x[2])
+        # u_history.append(u)
 
     # fig = plt.figure(figsize=(4, 3.5))
-    fig = figure.Figure(figsize=(4, 3.5))
-    ax = fig.add_subplot(projection="3d")
+    # fig = figure.Figure(figsize=(4, 3.5))
+    # ax = fig.add_subplot(projection="3d")
 
-    for i in range(N_PARTICLES):
-        ax.scatter(np.asarray(x_history)[:, i], np.asarray(y_history)[:, i], np.asarray(z_history)[:, i],
-                   c=np.arange(ITERATIONS), cmap="rainbow", s=.5)
+    # for i in range(N_PARTICLES):
+    #     ax.scatter(np.asarray(x_history)[:, i], np.asarray(y_history)[:, i], np.asarray(z_history)[:, i],
+    #                c=np.arange(ITERATIONS), cmap="rainbow", s=.5)
 
-    ax.set_xlabel("x [m]")
-    ax.set_ylabel("y [m]")
-    ax.set_zlabel("z [m]")
+    # ax.set_xlabel("x [m]")
+    # ax.set_ylabel("y [m]")
+    # ax.set_zlabel("z [m]")
 
-    ax.set_xlim([0, BOXSIZE])
-    ax.set_ylim([0, BOXSIZE])
-    ax.set_zlim([0, BOXSIZE])
-    fig.suptitle("Particle trajectory (purple is early, red is later)")
+    # ax.set_xlim([0, BOXSIZE])
+    # ax.set_ylim([0, BOXSIZE])
+    # ax.set_zlim([0, BOXSIZE])
+    # fig.suptitle("Particle trajectory (purple is early, red is later)")
 
-    if not os.path.exists("images"):
-        os.mkdir("images")
+    # if not os.path.exists("images"):
+    #     os.mkdir("images")
 
-    fig.savefig("images/test.png", facecolor="white")
-    Ek = np.array(kinetic_energy(u_history), dtype=float)
-    print(f"sum absoulute diff of Ek {np.sum(np.abs(np.diff(Ek)))}")
-    return fig
+    # fig.savefig("images/test.png", facecolor="white")
+    # Ek = np.array(kinetic_energy(u_history), dtype=float)
+    # print(f"sum absoulute diff of Ek {np.sum(np.abs(np.diff(Ek)))}")
+    # return fig
 
 
 if __name__ == '__main__':
