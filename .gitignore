@@ -2,6 +2,7 @@ data
 venv-radiativecooling
 sources
 test.ipynb
+*.png
 
 
 # Byte-compiled / optimized / DLL files
