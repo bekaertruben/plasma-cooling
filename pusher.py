@@ -2,7 +2,7 @@ import numpy as np
 from scipy.ndimage import map_coordinates
 from matplotlib import figure, gridspec
 import os
-from typing import Optional
+from typing import Optional, Union
 from initialization import *
 from tqdm import tqdm
 
@@ -228,10 +228,71 @@ def push(x0: np.ndarray, u0: np.ndarray, fields: dict, syn_drag: bool = True, ic
     return xnext, unext
 
 
-def kinetic_energy(u_history: list[np.array], mass: float = 1.0):
+def transferred_power(charge: Union[float, list[float]], velocity: np.ndarray, Eci: np.ndarray, Bci: np.ndarray):
+    """
+    Get the parallel and perpendicular power transferred from field to particle.
+
+    Arguments
+    ---------
+
+    charge: float or list[float]
+        particle charge in Coulomb
+
+    velocity: np.ndarray (shape: (3,N))
+        particle velocities at step n + 1/2
+
+    Eci: np.ndarray (shape: (3,N))
+        interpolated electric field at step n
+
+    Bci: np.ndarray (shape: (3,N))
+        interpolated magnetic field at step n
+
+    Returns
+    -------
+
+    Ppar: np.ndarray (shape: (N,))
+        parallel power
+
+    Pperp: np.ndarray (shape: (N,))
+        perpendicular power
+
+    """
+    Epar = np.diag(Eci.T @ Bci) * Bci / np.linalg.norm(Bci, axis=0) ** 2
+    Eperp = Eci - Epar
+
+    Ppar = charge * np.diag(velocity.T @ Epar)
+    Pperp = charge * np.diag(velocity.T @ Eperp)
+
+    return Ppar, Pperp
+
+
+def pitch_angle(u: np.ndarray, Bci: np.ndarray):
+    """
+    Get the pitch angle of the particle.
+
+    Arguments
+    ---------
+
+    u: np.ndarray (shape: (3,N))
+        particle velocities at step n + 1/2
+
+    Bci: np.ndarray (shape: (3,N))
+        interpolated magnetic field at step n
+
+    Returns
+    -------
+
+    pitch_angle: np.ndarray (shape: (N,))
+        pitch angle of the particle
+
+    """
+    return np.arccos(np.diag(u.T @ Bci) / (np.linalg.norm(u, axis=0) * np.linalg.norm(Bci, axis=0)))
+
+
+def kinetic_energy(u_history: list[np.array], mass: float = ELECTRON_MASS):
     Ek = []
     for u in tqdm(u_history):
-        Ek.append(mass * lorentz_factor(u)*C**2)
+        Ek.append(mass * (lorentz_factor(u) - 1.) * C**2)
     return Ek
 
 
