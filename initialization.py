@@ -2,9 +2,10 @@ from constants import *
 import numpy as np
 from scipy.stats import maxwell
 from warnings import warn
+from typing import Optional
 
 
-def position_uniform(N: int):
+def sample_pos_uniform(N: int):
     """
     Sample uniformly positions in the simulation space.
 
@@ -24,7 +25,7 @@ def position_uniform(N: int):
     return np.random.rand(3, N) * EDGES_METER[:, np.newaxis]
 
 
-def velocity_thermal(N: int, temp: float):
+def sample_velocity_thermal(N: int, temp: float):
     """
     Sample N velocity vectors from a thermal Maxwell distribution with temperature `temp`.
     The sampling is not safe against superluminous particles, do not put temperatures above ~1e8 K
@@ -56,10 +57,49 @@ def velocity_thermal(N: int, temp: float):
     return u * norm[np.newaxis, :]
 
 
+def load_fields(path: str = "data/flds.tot.00410"):
+    "from Daniel"
+    import h5py
+    prec = "float32"
+    f = h5py.File(path, 'r')
+    ex = np.array(f["/ex"], dtype=prec).T
+    ey = np.array(f["/ey"], dtype=prec).T
+    ez = np.array(f["/ez"], dtype=prec).T
+    bx = np.array(f["/bx"], dtype=prec).T
+    by = np.array(f["/by"], dtype=prec).T
+    bz = np.array(f["/bz"], dtype=prec).T
+    f.close()
+
+    fields = {
+        "ex": ex,
+        "ey": ey,
+        "ez": ez,
+        "bx": bx,
+        "by": by,
+        "bz": bz
+    }
+
+    Bnorm = np.mean(bz)
+
+    return fields, Bnorm
+
+
+def uniform_B(bdir: str = "z", val: Optional[float] = None):
+    directions = ["x", "y", "z"]
+    if bdir not in directions:
+        raise ValueError(f"Direction {bdir} not in {directions}")
+    fields = {key: np.zeros((N_CELLS, N_CELLS, N_CELLS)) for key in FIELDNAMES}
+    if val is not None:
+        fields[f"b{bdir}"] += val
+    else:
+        fields[f"b{bdir}"] += 50
+    return fields
+
+
 def main():
     from matplotlib import figure
     N = int(1e5)
-    pos = position_uniform(N)
+    pos = sample_pos_uniform(N)
 
     fig = figure.Figure()
     ax = fig.add_subplot()
