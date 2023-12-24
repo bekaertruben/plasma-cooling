@@ -4,7 +4,7 @@ from typing import Optional
 from boris_pusher import lorentz_factor
 
 
-# TODO: verify difference between relativistic velocity and regular (u = \gamma v). We are very much using velocity I believe
+# TODO: verify difference between relativistic velocity and regular (u = \gamma v or \beta = \gamma u or whatever). We are very much using velocity I believe
 def radiate_synchrotron(u0: np.ndarray, u1: np.ndarray, Eci: np.ndarray, Bci: np.ndarray, Bnorm: Optional[float] = None):
     if Bnorm is None:
         Bnorm = 1.
@@ -34,7 +34,7 @@ def radiate_inversecompton(u0: np.ndarray, u1: np.ndarray, Eci: np.ndarray, Bci:
     gci = lorentz_factor(uci)
     betaci = uci/gci
 
-    prefactor = - np.abs(Q_OVER_M) * Bnorm * BETA_REC / (C * GAMMA_IC**2)
+    prefactor = abs(Q_OVER_M) * Bnorm * BETA_REC / (C * GAMMA_IC**2)
 
-    unext = u0 + DT * prefactor * betaci * gci ** 2
+    unext = u0 - DT * prefactor * betaci * gci ** 2
     return unext
