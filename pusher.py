@@ -39,8 +39,7 @@ def interpolate_field(x0: np.ndarray, F: np.ndarray):
 
     """
     if len(x0.shape) == 3:
-        x0 = np.moveaxis(x0, 0, -1)
-        return np.moveaxis(map_coordinates(F, x0, order=1, mode="grid-wrap"), -1, 0)
+        x0 = np.swapaxes(x0, 0, 1)
     return map_coordinates(F, x0, order=1, mode='grid-wrap')
 
 
@@ -360,11 +359,15 @@ def transferred_power(charge: Union[float, list[float]],
                      for key, value in fields.items()}
         Eci = np.array([fields_ci[key] for key in ["ex", "ey", "ez"]])
         Bci = np.array([fields_ci[key] for key in ["bx", "by", "bz"]])
+        if len(position.shape) >= 2:
+            Eci = np.swapaxes(Eci, 0, 1)
+            Bci = np.swapaxes(Bci, 0, 1)
 
     # Epar = np.diag(Eci.T @ Bci) * Bci / \
     #     np.linalg.norm(Bci, axis=len(Bci.shape)-2) ** 2
-    Epar = np.einsum("...ji,...ji,...ki -> ...ki", Eci, Bci,
-                     Bci) / np.linalg.norm(Bci, axis=-2) ** 2
+    normalization = np.linalg.norm(Bci, axis=-2) ** 2
+    Epar = np.einsum("...ji,...ji,...ki->...ki", Eci, Bci, Bci)
+    Epar /= normalization[:, np.newaxis, :]
     Eperp = Eci - Epar
 
     Ppar = charge * np.einsum("...ji,...ji -> ...i", velocity, Epar)
