@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.constants import electron_mass as ELECTRON_MASS
 from scipy.constants import Boltzmann as KB
+from scipy.constants import elementary_charge as E_CHARGE
 
 R_E = 2.81794e-15  # meter (classical electron radius)
 C = 3e8  # meter/sec
