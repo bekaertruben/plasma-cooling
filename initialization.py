@@ -94,23 +94,3 @@ def uniform_B(bdir: str = "z", val: Optional[float] = None):
     else:
         fields[f"b{bdir}"] += 50
     return fields
-
-
-def main():
-    from matplotlib import figure
-    N = int(1e5)
-    pos = sample_pos_uniform(N)
-
-    fig = figure.Figure()
-    ax = fig.add_subplot()
-
-    for i in range(3):
-        ax.hist(pos[i], histtype="step", bins="fd", label=f"$x_{i}$")
-    ax.set_xlabel("position")
-    ax.set_ylabel("counts")
-    ax.legend()
-    fig.savefig("images/positions.png", facecolor="white")
-
-
-if __name__ == '__main__':
-    main()
