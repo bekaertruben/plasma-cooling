@@ -4,7 +4,7 @@ from scipy.constants import Boltzmann as KB
 from scipy.constants import elementary_charge as E_CHARGE
 
 R_E = 2.81794e-15  # meter (classical electron radius)
-C = 3e8  # meter/sec
+C = np.double(2.99792458 * 1e8)  # meter/sec
 BOXSIZE = 1e8  # meter
 CC = 0.45
 
