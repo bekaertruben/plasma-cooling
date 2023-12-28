@@ -45,7 +45,7 @@ def sample_velocity_thermal(N: int, temp: float):
     u: numpy.ndarray (shape: (3, N))
         velocities
     """
-    u = np.random.rand(3, N)
+    u = np.random.randn(3, N)
     u /= np.linalg.norm(u, axis=0)
     scale = np.sqrt(KB * temp / ELECTRON_MASS)
     norm = maxwell.rvs(loc=0, scale=scale, size=N)

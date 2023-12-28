@@ -20,7 +20,7 @@ def apply_periodicity(X0: np.ndarray, edges: np.ndarray):
     return np.mod(X0, edges[:, np.newaxis])
 
 
-def interpolate_field(x0: np.ndarray, F: np.ndarray):
+def interpolate_field(x0: np.ndarray, F: np.ndarray, edges: np.ndarray = EDGES_METER):
     """
     Interpolate F at x0
 
@@ -32,6 +32,9 @@ def interpolate_field(x0: np.ndarray, F: np.ndarray):
     F: np.ndarray (shape: (N_CELLS, N_CELLS, N_CELLS))
         field to interpolate
 
+    edges: np.ndarray (shape: (3,))
+        edges of the simulation box in meters
+
     Returns
     -------
     F_interp: np.ndarray (shape: (*,N))
@@ -39,8 +42,18 @@ def interpolate_field(x0: np.ndarray, F: np.ndarray):
 
     """
     if len(x0.shape) == 3:
-        x0 = np.swapaxes(x0, 0, 1)
-    return map_coordinates(F, x0, order=1, mode='grid-wrap')
+        # (3,*,N), if no copy a view is returned
+        x = np.array(np.swapaxes(x0, 0, 1), copy=True)
+        # weird bug I dont understand: if the below two lines are not seperated the results are wrong
+        x = x / edges[:, np.newaxis, np.newaxis]
+        x *= np.array(F.shape)[:, np.newaxis, np.newaxis]
+    elif len(x0.shape) == 2:
+        x = x0 / edges[:, np.newaxis] * np.array(F.shape)[:, np.newaxis]
+    else:
+        raise ValueError(f"Invalid shape for x0 {x0.shape}")
+
+    F_interp = map_coordinates(F, x, order=1, mode='grid-wrap')
+    return F_interp
 
 
 def lorentz_factor(u: np.ndarray):
@@ -355,8 +368,8 @@ def transferred_power(charge: Union[float, list[float]],
             "Eci and Bci have to be passed, or fields and position. No consistent arguments are given.")
 
     if Eci is None or Bci is None:
-        fields_ci = {key: interpolate_field(position, value)
-                     for key, value in fields.items()}
+        fields_ci = {key: interpolate_field(
+            position, value) for key, value in fields.items()}
         Eci = np.array([fields_ci[key] for key in ["ex", "ey", "ez"]])
         Bci = np.array([fields_ci[key] for key in ["bx", "by", "bz"]])
         if len(position.shape) >= 2:
@@ -431,55 +444,3 @@ def kinetic_energy(u: list[np.array], mass: float = ELECTRON_MASS):
 
     """
     return mass * (lorentz_factor(u) - 1.) * C**2
-
-
-def main():
-
-    fields, benidorm = load_fields()
-
-    N_PARTICLES = 5
-    x = sample_pos_uniform(N_PARTICLES)
-    u = sample_velocity_thermal(N_PARTICLES, 5e5)
-#
-    # x_history = []
-    # y_history = []
-    # z_history = []
-#
-    # u_history = []
-#
-    for _ in tqdm(range(ITERATIONS)):
-        x, u = push(x, u, fields, Bnorm=benidorm)
-
-        # x_history.append(x[0])
-        # y_history.append(x[1])
-        # z_history.append(x[2])
-        # u_history.append(u)
-
-    # fig = plt.figure(figsize=(4, 3.5))
-    # fig = figure.Figure(figsize=(4, 3.5))
-    # ax = fig.add_subplot(projection="3d")
-
-    # for i in range(N_PARTICLES):
-    #     ax.scatter(np.asarray(x_history)[:, i], np.asarray(y_history)[:, i], np.asarray(z_history)[:, i],
-    #                c=np.arange(ITERATIONS), cmap="rainbow", s=.5)
-
-    # ax.set_xlabel("x [m]")
-    # ax.set_ylabel("y [m]")
-    # ax.set_zlabel("z [m]")
-
-    # ax.set_xlim([0, BOXSIZE])
-    # ax.set_ylim([0, BOXSIZE])
-    # ax.set_zlim([0, BOXSIZE])
-    # fig.suptitle("Particle trajectory (purple is early, red is later)")
-
-    # if not os.path.exists("images"):
-    #     os.mkdir("images")
-
-    # fig.savefig("images/test.png", facecolor="white")
-    # Ek = np.array(kinetic_energy(u_history), dtype=float)
-    # print(f"sum absoulute diff of Ek {np.sum(np.abs(np.diff(Ek)))}")
-    # return fig
-
-
-if __name__ == '__main__':
-    main()
