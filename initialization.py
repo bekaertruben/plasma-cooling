@@ -70,27 +70,15 @@ def load_fields(path: str = "data/flds.tot.00410"):
     bz = np.array(f["/bz"], dtype=prec).T
     f.close()
 
-    fields = {
-        "ex": ex,
-        "ey": ey,
-        "ez": ez,
-        "bx": bx,
-        "by": by,
-        "bz": bz
-    }
-
     Bnorm = np.mean(bz)
 
+    fields = {
+        "ex": ex/Bnorm,
+        "ey": ey/Bnorm,
+        "ez": ez/Bnorm,
+        "bx": bx/Bnorm,
+        "by": by/Bnorm,
+        "bz": bz/Bnorm
+    }
+
     return fields, Bnorm
-
-
-def uniform_B(bdir: str = "z", val: Optional[float] = None):
-    directions = ["x", "y", "z"]
-    if bdir not in directions:
-        raise ValueError(f"Direction {bdir} not in {directions}")
-    fields = {key: np.zeros((N_CELLS, N_CELLS, N_CELLS)) for key in FIELDNAMES}
-    if val is not None:
-        fields[f"b{bdir}"] += val
-    else:
-        fields[f"b{bdir}"] += 50
-    return fields

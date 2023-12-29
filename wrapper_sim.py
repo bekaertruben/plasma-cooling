@@ -9,21 +9,14 @@ from warnings import warn
 
 
 class Simulation():
-    def __init__(self, boxsize: float = BOXSIZE, n_cells: int = N_CELLS, simtime: Optional[float] = None, cc: float = CC) -> None:
-        self.boxsize = boxsize
+    def __init__(self, n_cells: int = N_CELLS, iterations: int = int(1e3), cc: float = CC) -> None:
         self.n_cells = n_cells
-        self.dx = boxsize / (4*n_cells)
         if cc > 0.5:
             warn(
                 f"Sim velocity of light {cc} is too high (> 0.5), simulation will be unstable")
-        self.dt = cc * self.dx / C
-        if simtime is None:
-            self.simtime = 5 * boxsize / C
-        else:
-            self.simtime = simtime
-        self.iterations = int(self.simtime/self.dt)
+        self.cc = cc
+        self.iterations = iterations
         self.edges_cells = np.array([n_cells, n_cells, n_cells])
-        self.edges_meter = np.ones(3) * boxsize
 
     def begin(self,
               n_particles: int,
@@ -36,15 +29,11 @@ class Simulation():
         if fields == "pic":
             self.fields, self.b_norm = init.load_fields()
         else:
-            self.fields = fields
-            self.b_norm = np.mean(fields["bz"])
-        if temperature > 1e8:
-            warn(
-                f"Temperature {temperature} is too high (> 1e8), particles will break relativity")
+            raise (ValueError("Fields different from `pic` not implemented."))
 
         self.n_particles = n_particles
 
-        self.positions = init.sample_pos_uniform(n_particles, self.edges_meter)
+        self.positions = init.sample_pos_uniform(n_particles, self.edges_cells)
         self.velocities = init.sample_velocity_thermal(
             n_particles, temperature)
         if number_of_saves == -1:
@@ -59,17 +48,15 @@ class Simulation():
 
         self.pos_history[0] = self.positions
         self.vel_history[0] = self.velocities
-
-        self.Ek = np.zeros((self.number_of_saves, self.n_particles))
-        self.transferred_power = {'par': np.zeros(
-            (self.number_of_saves, self.n_particles)), 'perp': np.zeros((self.number_of_saves, self.n_particles))}
+        self.transferred_power_fraction = np.zeros(
+            (self.number_of_saves, self.n_particles))
 
         self.gamma_drag = gamma_drag
         self.beta_rec = beta_rec
 
     def _iteration(self, i: int, save: bool = False) -> None:
         self.positions, self.velocities = pusher.push(
-            self.positions, self.velocities, self.fields, self.gamma_drag, self.dt, self.edges_meter, self.beta_rec, self.b_norm)
+            self.positions, self.velocities, self.fields, self.gamma_drag, self.beta_rec, self.b_norm, self.cc)
 
         if save:
             self.pos_history[(self.number_of_saves * i) //
@@ -81,9 +68,8 @@ class Simulation():
         for i in tqdm(range(1, self.iterations)):
             self._iteration(
                 i, save=(i % (self.iterations // self.number_of_saves) == 0))
-        self.Ek = pusher.kinetic_energy(self.vel_history)
-        self.transferred_power["par"], self.transferred_power["perp"] = pusher.transferred_power(
-            E_CHARGE, self.vel_history, fields=self.fields, position=self.pos_history)
+        self.transferred_power_fraction = pusher.transferred_power(
+            self.vel_history, fields=self.fields, position=self.pos_history)
         pass
 
     def end(self) -> None:

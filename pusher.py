@@ -20,7 +20,7 @@ def apply_periodicity(X0: np.ndarray, edges: np.ndarray):
     return np.mod(X0, edges[:, np.newaxis])
 
 
-def interpolate_field(x0: np.ndarray, F: np.ndarray, edges: np.ndarray = EDGES_METER):
+def interpolate_field(x0: np.ndarray, F: np.ndarray):
     """
     Interpolate F at x0
 
@@ -45,10 +45,8 @@ def interpolate_field(x0: np.ndarray, F: np.ndarray, edges: np.ndarray = EDGES_M
         # (3,*,N), if no copy a view is returned
         x = np.array(np.swapaxes(x0, 0, 1), copy=True)
         # weird bug I dont understand: if the below two lines are not seperated the results are wrong
-        x = x / edges[:, np.newaxis, np.newaxis]
-        x *= np.array(F.shape)[:, np.newaxis, np.newaxis]
     elif len(x0.shape) == 2:
-        x = x0 / edges[:, np.newaxis] * np.array(F.shape)[:, np.newaxis]
+        x = np.array(x0)
     else:
         raise ValueError(f"Invalid shape for x0 {x0.shape}")
 
@@ -71,10 +69,10 @@ def lorentz_factor(u: np.ndarray):
         lorentz factor
     """
 
-    return np.sqrt(1 + np.sum(np.square(u)/C**2, axis=-2))
+    return np.sqrt(1 + np.sum(np.square(u), axis=-2))
 
 
-def boris_push(x0: np.ndarray, u0: np.ndarray, fields: dict, dt: float, edges_meter: np.ndarray):
+def boris_push(x0: np.ndarray, u0: np.ndarray, fields: dict, bnorm: float, cc: float = CC):
     """
     Borish push (Lorentz force) on particles with velocity u0 and position x0.
 
@@ -88,12 +86,6 @@ def boris_push(x0: np.ndarray, u0: np.ndarray, fields: dict, dt: float, edges_me
 
     fields: dict
         keys must include 'ex','ey','ez','bx','by','bz'. The values are 3D arrays of shape (N_CELLS, N_CELLS, N_CELLS)
-
-    dt: float
-        time step in seconds
-
-    edges_meter: np.ndarray (shape: (3,))
-        edges of the simulation box in meters
 
     Returns
     -------
@@ -114,7 +106,7 @@ def boris_push(x0: np.ndarray, u0: np.ndarray, fields: dict, dt: float, edges_me
         raise KeyError(
             f"`fields` keys ({fields.keys()}) does not corresponds with {FIELDNAMES}")
 
-    xci = x0 + u0 * dt / (2 * lorentz_factor(u0))
+    xci = x0 + u0 / (2 * lorentz_factor(u0))
 
     # interpolate fields. if bottleneck could make it multiprocessed
     fields_ci = {key: interpolate_field(xci, value)
@@ -126,23 +118,25 @@ def boris_push(x0: np.ndarray, u0: np.ndarray, fields: dict, dt: float, edges_me
     Eci = np.array([fields_ci[key] for key in ["ex", "ey", "ez"]])
     Bci = np.array([fields_ci[key] for key in ["bx", "by", "bz"]])
 
-    umin = u0 + Q_OVER_M * dt * Eci / 2
+    dummy = 0.5 * Q_OVER_M * bnorm
+
+    E0 = Eci * dummy
+    B0 = Bci * dummy
+
+    umin = cc * u0 + E0
 
     # == lorentz_factor(uplus) == lorentz_factor(uci) see paper
-    g = lorentz_factor(umin)
+    g_temp = lorentz_factor(umin / cc)
 
-    t = Bci * Q_OVER_M * dt / (2 * g)
+    B0 *= g_temp
+    dummy = 2. / (1. + np.linalg.norm(B0)**2)
 
-    s = 2*t / (1 + np.linalg.norm(t)**2)
+    uplus = (umin + np.cross(umin, B0, axis=0))*dummy
 
-    uplus = umin + \
-        np.cross((umin + np.cross(umin, t, axis=0)),
-                 s, axis=0)
+    unext = (uplus + np.cross(uplus, B0, axis=0)) / CC
+    xnext = xci + unext / (2 * g_temp)
 
-    unext = uplus + Q_OVER_M * dt * Eci / 2
-    xnext = xci + unext * dt / (2 * g)
-
-    xnext = apply_periodicity(xnext, edges_meter)
+    xnext = apply_periodicity(xnext, np.array(EDGES_CELLS))
 
     return xnext, unext, Eci, Bci
 
@@ -156,7 +150,7 @@ def radiate_synchrotron(u0: np.ndarray,
                         Bnorm: float,
                         beta_rec: float,
                         gamma_syn: float,
-                        dt: float):
+                        cc: float = CC):
     """
     Compute the radiative drag on a particle due to synchrotron radiation.
 
@@ -183,9 +177,6 @@ def radiate_synchrotron(u0: np.ndarray,
     gamma_syn: float
         typical lorentz factor for synchrotron drag
 
-    dt: float
-        time step in seconds
-
     Returns
     -------
     unext: np.ndarray (shape: (3,N))
@@ -201,15 +192,16 @@ def radiate_synchrotron(u0: np.ndarray,
     beta_dot_e = np.einsum("ji,ji->i", betaci, Eci)
 
     kappa_R = np.cross(Ebar, Bci, axis=0) + beta_dot_e * Eci
-    chi_R_sq = np.square(np.linalg.norm(Ebar, axis=0)) - np.square(beta_dot_e)
+    chi_R_sq = np.abs(np.square(np.linalg.norm(
+        Ebar, axis=0)) - np.square(beta_dot_e))
 
-    prefactor = abs(Q_OVER_M) * Bnorm * beta_rec / (C * gamma_syn**2)
+    prefactor = Bnorm * beta_rec / (cc * gamma_syn**2)
 
-    unext = u0 + dt * prefactor * (kappa_R - gci**2 * chi_R_sq * betaci)
+    unext = u0 + prefactor * (kappa_R - gci * chi_R_sq * uci)
     return unext
 
 
-def radiate_inversecompton(u0: np.ndarray, u1: np.ndarray, Bnorm: float, beta_rec: float, gamma_ic: float, dt: float):
+def radiate_inversecompton(u0: np.ndarray, u1: np.ndarray, Bnorm: float, beta_rec: float, gamma_ic: float, cc: float = CC):
     """
     Compute the radiative drag on a particle due to inverse compton radiation.
 
@@ -230,9 +222,6 @@ def radiate_inversecompton(u0: np.ndarray, u1: np.ndarray, Bnorm: float, beta_re
     gamma_ic: float
         typical lorentz factor for inverse compton drag
 
-    dt: float
-        time step in seconds
-
     Returns
     -------
     unext: np.ndarray (shape: (3,N))
@@ -241,11 +230,10 @@ def radiate_inversecompton(u0: np.ndarray, u1: np.ndarray, Bnorm: float, beta_re
     """
     uci = 0.5 * (u0 + u1)
     gci = lorentz_factor(uci)
-    betaci = uci/gci
 
-    prefactor = abs(Q_OVER_M) * Bnorm * beta_rec / (C * gamma_ic**2)
+    prefactor = Bnorm * beta_rec / (cc * gamma_ic**2)
 
-    unext = u0 - dt * prefactor * betaci * gci ** 2
+    unext = u0 - prefactor * uci * gci
     return unext
 
 
@@ -253,10 +241,9 @@ def push(x0: np.ndarray,
          u0: np.ndarray,
          fields: dict,
          gamma_drag: dict,
-         dt: float,
-         edges_meter: np.ndarray,
          beta_rec: float,
-         Bnorm: Optional[float] = None):
+         Bnorm: Optional[float] = None,
+         cc: float = CC):
     """
     Combine the unmodified Boris pusher with radiative drag (inverse compton and synchrotron).
     This pusher assumes a dominant contribution from the Lorentz force, such that no modified pusher is needed.
@@ -274,9 +261,6 @@ def push(x0: np.ndarray,
 
     gamma_drag: dict
         dictionary with keys "syn" and "ic" and values of the typical lorentz factors for synchrotron and inverse compton drag. If a key is missing, the corresponding drag is not applied.
-
-    dt: float
-        time step in seconds
 
     edges_meter: np.ndarray (shape: (3,))
         edges of the simulation box in meters
@@ -296,7 +280,7 @@ def push(x0: np.ndarray,
     if Bnorm is None:
         Bnorm = np.mean(fields["bz"])
 
-    xnext, u_lorentz, Eci, Bci = boris_push(x0, u0, fields, dt, edges_meter)
+    xnext, u_lorentz, Eci, Bci = boris_push(x0, u0, fields, Bnorm, cc)
 
     syn_drag = "syn" in gamma_drag.keys()
     ic_drag = "ic" in gamma_drag.keys()
@@ -306,11 +290,11 @@ def push(x0: np.ndarray,
 
     if syn_drag:
         u_syn = radiate_synchrotron(
-            u0, u_lorentz, Eci, Bci, Bnorm, beta_rec, gamma_drag["syn"], dt)
+            u0, u_lorentz, Eci, Bci, Bnorm, beta_rec, gamma_drag["syn"], cc)
 
     if ic_drag:
         u_ic = radiate_inversecompton(
-            u0, u_lorentz, Bnorm, beta_rec, gamma_drag["ic"], dt)
+            u0, u_lorentz, Bnorm, beta_rec, gamma_drag["ic"], cc)
 
     if syn_drag and not ic_drag:
         unext = u_lorentz + u_syn - u0
@@ -324,8 +308,7 @@ def push(x0: np.ndarray,
     return xnext, unext
 
 
-def transferred_power(charge: Union[float, list[float]],
-                      velocity: np.ndarray,
+def transferred_power(velocity: np.ndarray,
                       Eci: Optional[np.ndarray] = None,
                       Bci: Optional[np.ndarray] = None,
                       fields: Optional[dict] = None,
@@ -356,11 +339,8 @@ def transferred_power(charge: Union[float, list[float]],
 
     Returns
     -------
-    Ppar: np.ndarray (shape: (**, N))
-        parallel power
-
-    Pperp: np.ndarray (shape: (**, N))
-        perpendicular power
+    Ppar / Pperp: np.ndarray (shape: (**, N))
+        ratio parallel over perpendicular power
 
     """
     if (Eci is None or Bci is None) and (fields is None or position is None):
@@ -383,10 +363,10 @@ def transferred_power(charge: Union[float, list[float]],
     Epar /= normalization[:, np.newaxis, :]
     Eperp = Eci - Epar
 
-    Ppar = charge * np.einsum("...ji,...ji -> ...i", velocity, Epar)
-    Pperp = charge * np.einsum("...ji,...ji -> ...i", velocity, Eperp)
+    Ppar = np.einsum("...ji,...ji -> ...i", velocity, Epar)
+    Pperp = np.einsum("...ji,...ji -> ...i", velocity, Eperp)
 
-    return Ppar, Pperp
+    return Ppar / Pperp
 
 
 def pitch_angle(u: np.ndarray, Bci: Optional[np.ndarray] = None, fields: Optional[dict] = None, position: Optional[np.ndarray] = None):
@@ -423,24 +403,3 @@ def pitch_angle(u: np.ndarray, Bci: Optional[np.ndarray] = None, fields: Optiona
         Bci = np.array([fields_ci[key] for key in ["bx", "by", "bz"]])
 
     return np.arccos(np.einsum("...ji, ...ji -> ...i", u, Bci) / (np.linalg.norm(u, axis=-2) * np.linalg.norm(Bci, axis=-2)))
-
-
-def kinetic_energy(u: list[np.array], mass: float = ELECTRON_MASS):
-    """
-    Compute the kinetic energy of particles with velocity u. No unit conversion is done.
-
-    Arguments
-    ---------
-    u: list[np.array]
-        particle velocities. Dimension -2 is spatial
-
-    mass: float
-        particle mass
-
-    Returns
-    -------
-    Ek: np.ndarray (shape: (*,N))
-        kinetic energy
-
-    """
-    return mass * (lorentz_factor(u) - 1.) * C**2
