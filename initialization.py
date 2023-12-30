@@ -7,7 +7,7 @@ from warnings import warn
 from typing import Optional
 
 
-def sample_pos_uniform(N: int, edges_meter: np.ndarray = EDGES_METER):
+def sample_pos_uniform(N: int, edges_cells: np.ndarray = EDGES_CELLS):
     """
     Sample uniformly positions in the simulation space.
 
@@ -24,7 +24,7 @@ def sample_pos_uniform(N: int, edges_meter: np.ndarray = EDGES_METER):
         sampled positions
 
     """
-    return np.random.rand(3, N) * edges_meter[:, np.newaxis]
+    return np.random.rand(3, N) * edges_cells[:, np.newaxis]
 
 
 def sample_velocity_thermal(N: int, temp: float):
