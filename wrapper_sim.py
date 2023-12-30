@@ -1,4 +1,6 @@
 from matplotlib import figure, gridspec
+import os
+import pickle
 import numpy as np
 from tqdm import tqdm
 import pusher
@@ -9,7 +11,7 @@ from warnings import warn
 
 
 class Simulation():
-    def __init__(self, n_cells: int = N_CELLS, iterations: int = int(1e3), cc: float = CC) -> None:
+    def __init__(self, n_cells: int = N_CELLS, iterations: int = 1000, cc: float = CC) -> None:
         self.n_cells = n_cells
         if cc > 0.5:
             warn(
@@ -48,8 +50,8 @@ class Simulation():
 
         self.pos_history[0] = self.positions
         self.vel_history[0] = self.velocities
-        self.transferred_power_fraction = np.zeros(
-            (self.number_of_saves, self.n_particles))
+        # self.transferred_power_fraction = np.zeros(
+        # (self.number_of_saves, self.n_particles))
 
         self.gamma_drag = gamma_drag
         self.beta_rec = beta_rec
@@ -68,82 +70,55 @@ class Simulation():
         for i in tqdm(range(1, self.iterations)):
             self._iteration(
                 i, save=(i % (self.iterations // self.number_of_saves) == 0))
-        self.transferred_power_fraction = pusher.transferred_power(
-            self.vel_history, fields=self.fields, position=self.pos_history)
+        # self.transferred_power_fraction = pusher.transferred_power(
+            # self.vel_history, fields=self.fields, position=self.pos_history)
         pass
 
-    def end(self) -> None:
-        pass
+    to_pickle = ['n_cells', 'cc', 'iterations', 'b_norm',
+                 'n_particles', 'number_of_saves', 'gamma_drag', 'beta_rec']
 
+    def _attrmeta(self) -> dict:
+        attr = {key: self.__getattribute__(key)
+                for key in Simulation.to_pickle}
+        return attr
 
-def plot_trajectories(time: np.ndarray, pos: np.ndarray, vel: np.ndarray, fields: np.ndarray) -> figure.Figure:
-    linestyles = ["-", "--", "-.", ":"]
-    colors = ["k", "c", "m", "y", "r", "g", "b"]
+    def end(self, name: str, prefix: str = "pickles") -> None:
+        if not os.path.exists(prefix):
+            os.mkdir(prefix)
+        path = prefix + "/" + name
+        if not os.path.exists(path):
+            os.mkdir(path)
 
-    fig = figure.Figure(figsize=(7, 5))
-    gs = gridspec.GridSpec(2, 2, fig)
+        with open(path+"/meta.pkl", "wb") as f:
+            pickle.dump(self._attrmeta(), f)
 
-    axp = fig.add_subplot(gs[0, 0])
-    axu = fig.add_subplot(gs[1, 0], sharex=axp)
-    axE = fig.add_subplot(gs[0, 1])
-    axB = fig.add_subplot(gs[1, 1], sharex=axE)
+        np.save(path+"/xhist.npy", self.pos_history)
+        np.save(path+"/uhist.npy", self.vel_history)
 
-    for i, x in enumerate(np.swapaxes(pos, 0, -1)):
-        for j in range(3):
-            axp.plot(time, x[j], ls=linestyles[i %
-                     len(linestyles)], color=colors[j], lw=0.5)
+    def load(self, name: str, prefix: str = "pickles"):
+        path = prefix + "/" + name
 
-    for i, u in enumerate(np.swapaxes(vel, 0, -1)):
-        for j in range(3):
-            axu.plot(time, u[j], ls=linestyles[i %
-                     len(linestyles)], color=colors[j], lw=0.5)
+        with open(path + "/meta.pkl", "rb") as f:
+            attr = pickle.load(f)
 
-    fields_ci = {key: pusher.interpolate_field(pos, value)
-                 for key, value in fields.items()}
-    Eci = np.array([fields_ci[key] for key in ["ex", "ey", "ez"]])
-    Bci = np.array([fields_ci[key] for key in ["bx", "by", "bz"]])
-    Eci = np.swapaxes(Eci, 0, 1)
+        for key, value in attr.items():
+            self.__setattr__(key, value)
 
-    Bci = np.swapaxes(Bci, 0, 1)
-
-    for i, E in enumerate(np.swapaxes(Eci, 0, -1)):
-        for j in range(3):
-            axE.plot(time, E[j], ls=linestyles[i %
-                     len(linestyles)], color=colors[j], lw=0.5)
-
-    for i, B in enumerate(np.swapaxes(Bci, 0, -1)):
-        for j in range(3):
-            axB.plot(time, B[j], ls=linestyles[i %
-                     len(linestyles)], color=colors[j], lw=0.5)
-
-    axp.set_ylabel("Position [m]")
-    axu.set_ylabel("Velocity [m/s]")
-    axE.set_ylabel("Electric Field")
-    axB.set_ylabel("Magnetic Field")
-    axB.set_xlabel("Time [s]")
-    axE.set_xlabel("Time [s]")
-    axp.set_xlabel("Time [s]")
-    axu.set_xlabel("Time [s]")
-    axp.set_title("Particle Trajectories")
-    axu.set_title("Particle Velocities")
-    axE.set_title("Electric Field")
-    axB.set_title("Magnetic Field")
-
-    fig.suptitle("Time evolution (Black: x, Cyan: y, Magenta: z)")
-
-    return fig
+        self.pos_history = np.load(path + "/xhist.npy")
+        self.vel_history = np.load(path + "/uhist.npy")
 
 
 def main():
-    sim = Simulation(simtime=5*BOXSIZE/C, cc=0.45)
-    sim.begin(1, 1e8, number_of_saves=-1)
+    sim = Simulation(iterations=3)
+    sim.begin(1, 0.3, number_of_saves=2)
     sim.run()
-    # sim.end()
+    sim.end(name="test")
 
-    fig = plot_trajectories(np.linspace(
-        0, sim.simtime, sim.iterations), sim.pos_history, sim.vel_history, sim.fields)
 
-    fig.savefig("images/time_evolution.png", facecolor="white")
+def main2():
+    sim = Simulation()
+    sim.load("test")
+    print(sim.pos_history.shape)
 
 
 def plot_fields():
@@ -168,5 +143,5 @@ def interpolate_fields_test():
 
 
 if __name__ == '__main__':
-    main()
+    main2()
     # plot_fields()
