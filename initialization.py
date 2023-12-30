@@ -1,6 +1,8 @@
 from constants import *
 import numpy as np
-from scipy.stats import maxwell
+from scipy.stats import rv_continuous
+from scipy.special import kn
+from scipy.integrate import quad
 from warnings import warn
 from typing import Optional
 
@@ -25,10 +27,43 @@ def sample_pos_uniform(N: int, edges_meter: np.ndarray = EDGES_METER):
     return np.random.rand(3, N) * edges_meter[:, np.newaxis]
 
 
+class MaxwellJuttner(rv_continuous):
+    """
+    Describes the Maxwell-Jüttner distribution for the Lorentz factor
+    See https://en.wikipedia.org/wiki/Maxwell-Jüttner_distribution
+
+    Arguments
+    ---------
+    
+    temp: float
+        the temperature of the distribution in units of mc^2 / k_B
+    """
+
+    def _pdf(self, gamma, temp):
+        if gamma < 1:
+            return 0
+
+        beta = np.sqrt(1 - 1/gamma**2)
+        N =  gamma**2 * beta / (temp * kn(2, 1/temp))
+        return N * gamma**2 * beta * np.exp(-gamma/temp)
+    
+    def _cdf(self, gamma, temp):
+        if gamma < 1:
+            return 0
+
+        beta = np.sqrt(1 - 1/gamma**2)
+        N =  1 / (temp * kn(2, 1/temp))
+
+        def integrand(g):
+            b = np.sqrt(1 - 1/g**2)
+            return g**2 * b * np.exp(-g/temp)
+
+        return N * quad(integrand, 1, gamma, epsabs=1e-5)[0]
+
+
 def sample_velocity_thermal(N: int, temp: float):
     """
-    Sample N velocity vectors from a thermal Maxwell distribution with temperature `temp`.
-    The sampling is not safe against superluminous particles, do not put temperatures above ~1e8 K
+    Sample N velocity vectors from a thermal Maxwell-Jüttner distribution with temperature `temp`.
 
     Arguments
     ---------
@@ -37,7 +72,7 @@ def sample_velocity_thermal(N: int, temp: float):
         number of particles
 
     temp: float
-        distribution temperature in Kelvin
+        the temperature of the distribution in units of mc^2 / k_B
 
     Returns
     -------
@@ -45,16 +80,14 @@ def sample_velocity_thermal(N: int, temp: float):
     u: numpy.ndarray (shape: (3, N))
         velocities
     """
-    u = np.random.randn(3, N)
-    u /= np.linalg.norm(u, axis=0)
-    scale = np.sqrt(KB * temp / ELECTRON_MASS)
-    norm = maxwell.rvs(loc=0, scale=scale, size=N)
-    where_superluminous = norm >= C
-    if np.sum(where_superluminous) != 0:
-        warn(
-            f"Sampled {round(100* np.sum(where_superluminous) / N,2)}% superluminous particles (v >= c), setting their velocities to (1-1e-8)c.")
-        norm[where_superluminous] = (1-1e-8) * C
-    return u * norm[np.newaxis, :]
+    dirs = np.random.randn(3, N)
+    dirs /= np.linalg.norm(dirs, axis=0)
+
+    mj = MaxwellJuttner(name='maxwell_juttner')
+    gammas = mj.rvs(temp=temp, size=N)
+    us = np.sqrt(gammas**2 - 1)
+
+    return us * dirs
 
 
 def load_fields(path: str = "data/flds.tot.00410"):
