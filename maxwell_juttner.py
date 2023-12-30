@@ -18,7 +18,7 @@ def _mj_pdf(x, T=0.3):
         T (float): the temperature of the distribution in units of mc^2 / k_B
 
     Returns:
-        float: The CDF of the Maxwell-Juttner distribution
+        float: The PDF of the Maxwell-Juttner distribution
     """
     if x <= 1:
         return 0
@@ -45,11 +45,13 @@ def _mj_cdf(x, T):
     return I
 
 
-
 def _mj_cdf_puiseux(x, T=0.3):
     """
     The Puiseux expansion of the CDF of the Maxwell-Juttner distribution
     Calculated to 8th order using Wolfram Alpha and integral-calculator.com
+
+    This is only valid for low temperatures (T <~ 0.4),
+    and also breaks down for large x, where the CDF should instead be approximated as 1.
 
     Args:
         x (float): the lorentz factor
