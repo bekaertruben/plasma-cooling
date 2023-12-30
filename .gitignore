@@ -3,7 +3,10 @@ venv-radiativecooling
 sources
 test.ipynb
 *.png
-
+pickles
+.vscode
+pyproject.toml
+requirements*.lock 
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

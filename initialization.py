@@ -1,11 +1,13 @@
 from constants import *
 import numpy as np
-from scipy.stats import maxwell
+from scipy.stats import rv_continuous
+from scipy.special import kn
+from scipy.integrate import quad
 from warnings import warn
 from typing import Optional
 
 
-def sample_pos_uniform(N: int, edges_meter: np.ndarray = EDGES_METER):
+def sample_pos_uniform(N: int, edges_cells: np.ndarray = EDGES_CELLS):
     """
     Sample uniformly positions in the simulation space.
 
@@ -22,13 +24,12 @@ def sample_pos_uniform(N: int, edges_meter: np.ndarray = EDGES_METER):
         sampled positions
 
     """
-    return np.random.rand(3, N) * edges_meter[:, np.newaxis]
+    return np.random.rand(3, N) * edges_cells[:, np.newaxis]
 
 
 def sample_velocity_thermal(N: int, temp: float):
     """
-    Sample N velocity vectors from a thermal Maxwell distribution with temperature `temp`.
-    The sampling is not safe against superluminous particles, do not put temperatures above ~1e8 K
+    Sample N velocity vectors from a thermal Maxwell-Jüttner distribution with temperature `temp`.
 
     Arguments
     ---------
@@ -37,7 +38,7 @@ def sample_velocity_thermal(N: int, temp: float):
         number of particles
 
     temp: float
-        distribution temperature in Kelvin
+        the temperature of the distribution in units of mc^2 / k_B
 
     Returns
     -------
@@ -45,16 +46,16 @@ def sample_velocity_thermal(N: int, temp: float):
     u: numpy.ndarray (shape: (3, N))
         velocities
     """
-    u = np.random.randn(3, N)
-    u /= np.linalg.norm(u, axis=0)
-    scale = np.sqrt(KB * temp / ELECTRON_MASS)
-    norm = maxwell.rvs(loc=0, scale=scale, size=N)
-    where_superluminous = norm >= C
-    if np.sum(where_superluminous) != 0:
-        warn(
-            f"Sampled {round(100* np.sum(where_superluminous) / N,2)}% superluminous particles (v >= c), setting their velocities to (1-1e-8)c.")
-        norm[where_superluminous] = (1-1e-8) * C
-    return u * norm[np.newaxis, :]
+    from maxwell_juttner import MaxwellJuttner
+
+    dirs = np.random.randn(3, N)
+    dirs /= np.linalg.norm(dirs, axis=0)
+
+    mj = MaxwellJuttner(name='maxwell_juttner')
+    gammas = mj.rvs(T=temp, size=N)
+    us = np.sqrt(gammas**2 - 1)
+
+    return us * dirs
 
 
 def load_fields(path: str = "data/flds.tot.00410"):
@@ -70,27 +71,15 @@ def load_fields(path: str = "data/flds.tot.00410"):
     bz = np.array(f["/bz"], dtype=prec).T
     f.close()
 
-    fields = {
-        "ex": ex,
-        "ey": ey,
-        "ez": ez,
-        "bx": bx,
-        "by": by,
-        "bz": bz
-    }
-
     Bnorm = np.mean(bz)
 
+    fields = {
+        "ex": ex/Bnorm,
+        "ey": ey/Bnorm,
+        "ez": ez/Bnorm,
+        "bx": bx/Bnorm,
+        "by": by/Bnorm,
+        "bz": bz/Bnorm
+    }
+
     return fields, Bnorm
-
-
-def uniform_B(bdir: str = "z", val: Optional[float] = None):
-    directions = ["x", "y", "z"]
-    if bdir not in directions:
-        raise ValueError(f"Direction {bdir} not in {directions}")
-    fields = {key: np.zeros((N_CELLS, N_CELLS, N_CELLS)) for key in FIELDNAMES}
-    if val is not None:
-        fields[f"b{bdir}"] += val
-    else:
-        fields[f"b{bdir}"] += 50
-    return fields
