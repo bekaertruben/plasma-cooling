@@ -3,6 +3,8 @@ venv-radiativecooling
 sources
 test.ipynb
 *.png
+pickles
+.vscode
 pyproject.toml
 requirements*.lock 
 
