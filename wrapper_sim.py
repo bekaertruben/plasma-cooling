@@ -23,10 +23,11 @@ class Simulation():
     def begin(self,
               n_particles: int,
               temperature: float,
-              fields: Union[str, dict] = "pic",
               gamma_drag: dict = {"syn": GAMMA_SYN, "ic": GAMMA_IC},
+              number_of_saves: int = 100,
               beta_rec: float = BETA_REC,
-              number_of_saves: int = 100) -> None:
+              fields: Union[str, dict] = "pic",
+              ) -> None:
 
         if fields == "pic":
             self.fields, self.b_norm = init.load_fields()
