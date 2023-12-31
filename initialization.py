@@ -4,6 +4,8 @@ import numpy as np
 import pandas as pd
 from warnings import warn
 from typing import Optional
+import os
+
 
 # Load precomputed Maxwell-Jüttner gamma samples
 if os.path.exists('data/MJ_gammas.csv'):
