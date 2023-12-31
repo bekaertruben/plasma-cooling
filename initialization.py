@@ -52,7 +52,7 @@ def sample_velocity_thermal(N: int, temp: float):
     dirs /= np.linalg.norm(dirs, axis=0)
 
     if f"T={temp}" in df.index and N <= df.shape[1]:
-        gammas = df.loc[f"T={temp}"].sample(N).values
+        gammas = MJ_gammas.loc[f"T={temp}"].sample(N).values
     else:
         mj = MaxwellJuttner(name='maxwell_juttner')
         gammas = mj.rvs(T=temp, size=N)
