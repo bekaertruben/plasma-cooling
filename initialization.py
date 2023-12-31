@@ -1,10 +1,12 @@
 from constants import *
+from maxwell_juttner import MaxwellJuttner
 import numpy as np
-from scipy.stats import rv_continuous
-from scipy.special import kn
-from scipy.integrate import quad
+import pandas as pd
 from warnings import warn
 from typing import Optional
+
+
+MJ_gammas = pd.read_csv('data/MJ_gammas.csv', index_col=0)
 
 
 def sample_pos_uniform(N: int, edges_cells: np.ndarray = EDGES_CELLS):
@@ -46,15 +48,16 @@ def sample_velocity_thermal(N: int, temp: float):
     u: numpy.ndarray (shape: (3, N))
         velocities
     """
-    from maxwell_juttner import MaxwellJuttner
-
     dirs = np.random.randn(3, N)
     dirs /= np.linalg.norm(dirs, axis=0)
 
-    mj = MaxwellJuttner(name='maxwell_juttner')
-    gammas = mj.rvs(T=temp, size=N)
-    us = np.sqrt(gammas**2 - 1)
+    if f"T={temp}" in df.index and N <= df.shape[1]:
+        gammas = df.loc[f"T={temp}"].sample(N).values
+    else:
+        mj = MaxwellJuttner(name='maxwell_juttner')
+        gammas = mj.rvs(T=temp, size=N)
 
+    us = np.sqrt(gammas**2 - 1)
     return us * dirs
 
 

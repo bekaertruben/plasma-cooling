@@ -4,11 +4,6 @@ from scipy.special import erf, kn
 from scipy.integrate import quad
 
 
-import numpy as np
-from scipy.stats import rv_continuous
-from scipy.special import erf, kn
-from scipy.integrate import quad
-
 def _mj_pdf(x, T=0.3):
     """
     The PDF of the Maxwell-Juttner distribution.
