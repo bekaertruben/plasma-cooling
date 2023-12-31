@@ -5,8 +5,11 @@ import pandas as pd
 from warnings import warn
 from typing import Optional
 
-
-MJ_gammas = pd.read_csv('data/MJ_gammas.csv', index_col=0)
+# Load precomputed Maxwell-Jüttner gamma samples
+if os.path.exists('data/MJ_gammas.csv'):
+    MJ_gammas = pd.read_csv('data/MJ_gammas.csv', index_col=0)
+else:
+    MJ_gammas = pd.DataFrame()
 
 
 def sample_pos_uniform(N: int, edges_cells: np.ndarray = EDGES_CELLS):
