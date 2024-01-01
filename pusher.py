@@ -120,7 +120,7 @@ def boris_push(x0: np.ndarray, u0: np.ndarray, fields: dict, bnorm: float, cc: f
 
     dummy = 0.5 * Q_OVER_M * bnorm
     E0 = Eci * dummy
-    dummy /= cc
+    # dummy /= cc
     B0 = Bci * dummy
 
     # half acceleration
@@ -128,7 +128,7 @@ def boris_push(x0: np.ndarray, u0: np.ndarray, fields: dict, bnorm: float, cc: f
 
     # first half magnetic rotation
     gamma1 = lorentz_factor(u1prime / cc)
-    f = 2. / (1. + np.sum(np.square(B0/gamma1), axis=0))
+    f = 2. / (1. + np.sum(np.square(B0/(cc * gamma1)), axis=0))
     u2prime = (u1prime + np.cross(u1prime/(cc * gamma1), B0, axis=0))*f
 
     # second half magnetic rotation + half acceleration
@@ -190,12 +190,12 @@ def radiate_synchrotron(u0: np.ndarray,
     beta_dot_e = np.einsum("ji,ji->i", betaci, Eci)
 
     kappa_R = np.cross(Ebar, Bci, axis=0) + beta_dot_e * Eci
-    chi_R_sq = np.abs(np.square(np.linalg.norm(
-        Ebar, axis=0)) - np.square(beta_dot_e))
+    chi_R_sq = np.abs(np.sum(np.square(Ebar), axis=0) - np.square(beta_dot_e))
 
     prefactor = Bnorm * beta_rec / (cc * gamma_syn**2)
 
     unext = u0 + prefactor * (kappa_R - gci * chi_R_sq * uci)
+    gafter = lorentz_factor(unext)
     return unext
 
 
@@ -232,6 +232,7 @@ def radiate_inversecompton(u0: np.ndarray, u1: np.ndarray, Bnorm: float, beta_re
     prefactor = Bnorm * beta_rec / (cc * gamma_ic**2)
 
     unext = u0 - prefactor * uci * gci
+    gafter = lorentz_factor(unext)
     return unext
 
 
