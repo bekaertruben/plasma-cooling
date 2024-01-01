@@ -124,16 +124,16 @@ def boris_push(x0: np.ndarray, u0: np.ndarray, fields: dict, bnorm: float, cc: f
     B0 = Bci * dummy
 
     # half acceleration
-    umin = cc * u0 + E0
+    u1prime = cc * u0 + E0
 
     # first half magnetic rotation
-    g_temp = lorentz_factor(umin / cc)
-    B0 /= g_temp[np.newaxis, :]
-    dummy = 2. / (1. + np.sum(np.square(B0), axis=0))
-    uplus = (umin + np.cross(umin, B0, axis=0))*dummy
+    gamma1 = lorentz_factor(u1prime / cc)
+    f = 2. / (1. + np.sum(np.square(B0/gamma1), axis=0))
+    u2prime = (u1prime + np.cross(u1prime/(cc * gamma1), B0, axis=0))*f
 
     # second half magnetic rotation + half acceleration
-    unext = (uplus + np.cross(uplus, B0, axis=0) + E0) / cc
+    u3prime = u1prime + np.cross(u2prime/(cc * gamma1), B0, axis=0) + E0
+    unext = u3prime / cc
     xnext = xci + unext / (2 * lorentz_factor(unext))
 
     xnext = apply_periodicity(xnext, np.array(EDGES_CELLS))
