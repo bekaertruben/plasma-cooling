@@ -1,5 +1,5 @@
 from constants import *
-from maxwell_juttner import MaxwellJuttner
+from maxwell_juttner import MaxwellJuttnerDistribution
 import numpy as np
 import pandas as pd
 from warnings import warn
@@ -59,8 +59,8 @@ def sample_velocity_thermal(N: int, temp: float):
     if f"T={temp}" in MJ_gammas.index and N <= MJ_gammas.shape[1]:
         gammas = MJ_gammas.loc[f"T={temp}"].sample(N).values
     else:
-        mj = MaxwellJuttner(name='maxwell_juttner')
-        gammas = mj.rvs(T=temp, size=N)
+        mj = MaxwellJuttnerDistribution(T=temp)
+        gammas = mj.sample(N)
 
     us = np.sqrt(gammas**2 - 1)
     return us * dirs
