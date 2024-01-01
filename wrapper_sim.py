@@ -115,7 +115,10 @@ class Simulation():
 
 def main():
     sim = Simulation(iterations=100)
-    sim.begin(2, 0.3, number_of_saves=-1, fields="uniform_B")
+    sim.begin(2, 0.3, number_of_saves=-1, fields="pic",
+              gamma_drag={"syn": 1, "ic": 1})
+
+    sim.velocities[:, 1] = sim.velocities[:, 0]
     sim.run()
     sim.end(name="test")
 
