@@ -119,28 +119,26 @@ def boris_push(x0: np.ndarray, u0: np.ndarray, fields: dict, bnorm: float, cc: f
     Bci = np.array([fields_ci[key] for key in ["bx", "by", "bz"]])
 
     dummy = 0.5 * Q_OVER_M * bnorm
-
     E0 = Eci * dummy
+    dummy /= cc
     B0 = Bci * dummy
 
+    # half acceleration
     umin = cc * u0 + E0
 
-    # == lorentz_factor(uplus) == lorentz_factor(uci) see paper
+    # first half magnetic rotation
     g_temp = lorentz_factor(umin / cc)
-
-    B0 *= g_temp
-    dummy = 2. / (1. + np.linalg.norm(B0)**2)
-
+    B0 *= g_temp[np.newaxis, :]
+    dummy = 2. / (1. + np.sum(np.square(B0), axis=0))
     uplus = (umin + np.cross(umin, B0, axis=0))*dummy
 
-    unext = (uplus + np.cross(uplus, B0, axis=0)) / CC
-    xnext = xci + unext / (2 * g_temp)
+    # second half magnetic rotation + half acceleration
+    unext = (uplus + np.cross(uplus, B0, axis=0)) / cc
+    xnext = xci + unext / (2 * lorentz_factor(unext))
 
     xnext = apply_periodicity(xnext, np.array(EDGES_CELLS))
 
     return xnext, unext, Eci, Bci
-
-# TODO: verify difference between relativistic velocity and regular (u = \gamma v or \beta = \gamma u or whatever). We are very much using velocity I believe
 
 
 def radiate_synchrotron(u0: np.ndarray,
