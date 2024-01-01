@@ -31,9 +31,13 @@ class Simulation():
 
         if fields == "pic":
             self.fields, self.b_norm = init.load_fields()
+        elif fields == "uniform_B":
+            self.fields, self.b_norm = init.uniform_B()
         else:
-            raise (ValueError("Fields different from `pic` not implemented."))
-
+            raise (ValueError(
+                "Fields different from `pic` or `uniform_B` not implemented."))
+            # self.fields = fields
+            # self.b_norm = np.mean(fields["bz"])
         self.n_particles = n_particles
 
         self.positions = init.sample_pos_uniform(n_particles, self.edges_cells)
@@ -110,8 +114,8 @@ class Simulation():
 
 
 def main():
-    sim = Simulation(iterations=3)
-    sim.begin(1, 0.3, number_of_saves=2)
+    sim = Simulation(iterations=100)
+    sim.begin(2, 0.3, number_of_saves=-1, fields="uniform_B")
     sim.run()
     sim.end(name="test")
 
@@ -144,5 +148,5 @@ def interpolate_fields_test():
 
 
 if __name__ == '__main__':
-    main2()
+    main()
     # plot_fields()
