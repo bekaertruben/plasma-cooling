@@ -91,3 +91,14 @@ def load_fields(path: str = "data/flds.tot.00410"):
     }
 
     return fields, Bnorm
+
+
+def uniform_B():
+    default = np.zeros([N_CELLS for _ in range(3)], dtype=float)
+    fields = {field: np.array(default) for field in FIELDNAMES}
+
+    fields["bz"] = np.ones_like(fields["bz"]) * 10.
+
+    Bnorm = np.mean(fields["bz"])
+
+    return fields, Bnorm
