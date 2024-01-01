@@ -128,7 +128,7 @@ def boris_push(x0: np.ndarray, u0: np.ndarray, fields: dict, bnorm: float, cc: f
 
     # first half magnetic rotation
     g_temp = lorentz_factor(umin / cc)
-    B0 *= g_temp[np.newaxis, :]
+    B0 /= g_temp[np.newaxis, :]
     dummy = 2. / (1. + np.sum(np.square(B0), axis=0))
     uplus = (umin + np.cross(umin, B0, axis=0))*dummy
 
