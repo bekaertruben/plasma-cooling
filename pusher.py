@@ -1,11 +1,6 @@
 import numpy as np
 from scipy.ndimage import map_coordinates
-from matplotlib import figure, gridspec
-import os
-from typing import Optional, Union
-from initialization import *
-from tqdm import tqdm
-
+from typing import Optional
 from constants import *
 
 
