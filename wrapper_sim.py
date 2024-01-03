@@ -33,9 +33,11 @@ class Simulation():
             self.fields, self.b_norm = init.load_fields()
         elif fields == "uniform_B":
             self.fields, self.b_norm = init.uniform_B()
+        elif fields == "uniform_E":
+            self.fields, self.b_norm = init.uniform_E()
         else:
             raise (ValueError(
-                "Fields different from `pic` or `uniform_B` not implemented."))
+                "Fields different from `pic` or `uniform_B` or `uniform_E` not implemented."))
             # self.fields = fields
             # self.b_norm = np.mean(fields["bz"])
         self.n_particles = n_particles
@@ -115,15 +117,13 @@ class Simulation():
 
 def main():
     sim = Simulation(iterations=100)
-    sim.begin(2, 0.3, number_of_saves=-1, fields="pic",
-              gamma_drag={"syn": 1, "ic": 1})
-
-    sim.velocities[:, 1] = sim.velocities[:, 0]
+    sim.begin(1000, 1, number_of_saves=2, fields="pic",
+              gamma_drag={"syn": 1})
     sim.run()
     sim.end(name="test")
 
 
-def main2():
+def main_load():
     sim = Simulation()
     sim.load("test")
     print(sim.pos_history.shape)
@@ -148,6 +148,13 @@ def plot_fields():
 def interpolate_fields_test():
     fields, _ = init.load_fields()
     # pos = np.linspace()
+
+
+def main_uniformE():
+    s = Simulation()
+    s.begin(100, 1, gamma_drag={}, number_of_saves=-1, fields="uniform_E")
+    s.run()
+    s.end("dragbug_uniformE")
 
 
 if __name__ == '__main__':

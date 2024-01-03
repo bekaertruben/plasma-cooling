@@ -114,20 +114,20 @@ def boris_push(x0: np.ndarray, u0: np.ndarray, fields: dict, bnorm: float, cc: f
     Bci = np.array([fields_ci[key] for key in ["bx", "by", "bz"]])
 
     dummy = 0.5 * Q_OVER_M * bnorm
-    E0 = Eci * dummy
+    e0 = Eci * dummy
     # dummy /= cc
-    B0 = Bci * dummy
+    b0 = Bci * dummy
 
     # half acceleration
-    u1prime = cc * u0 + E0
+    u1prime = cc * u0 + e0
 
     # first half magnetic rotation
     gamma1 = lorentz_factor(u1prime / cc)
-    f = 2. / (1. + np.sum(np.square(B0/(cc * gamma1)), axis=0))
-    u2prime = (u1prime + np.cross(u1prime/(cc * gamma1), B0, axis=0))*f
+    f = 2. / (1. + np.sum(np.square(b0/(cc * gamma1)), axis=0))
+    u2prime = (u1prime + np.cross(u1prime/(cc * gamma1), b0, axis=0))*f
 
     # second half magnetic rotation + half acceleration
-    u3prime = u1prime + np.cross(u2prime/(cc * gamma1), B0, axis=0) + E0
+    u3prime = u1prime + np.cross(u2prime/(cc * gamma1), b0, axis=0) + e0
     unext = u3prime / cc
     xnext = xci + unext / (2 * lorentz_factor(unext))
 
@@ -176,21 +176,25 @@ def radiate_synchrotron(u0: np.ndarray,
         synchrotron dragged particle velocities at step n + 1/2
 
     """
+    g0 = lorentz_factor(u0)
+    g1 = lorentz_factor(u1)
+
     uci = 0.5 * (u0 + u1)
     gci = lorentz_factor(uci)
-    betaci = uci/gci
+    betaci = uci / gci
 
     Ebar = Eci + np.cross(betaci, Bci, axis=0)
 
     beta_dot_e = np.einsum("ji,ji->i", betaci, Eci)
 
     kappa_R = np.cross(Ebar, Bci, axis=0) + beta_dot_e * Eci
-    chi_R_sq = np.abs(np.sum(np.square(Ebar), axis=0) - np.square(beta_dot_e))
+    chi_R_sq = np.sum(np.square(Ebar), axis=0) - beta_dot_e**2
 
     prefactor = Bnorm * beta_rec / (cc * gamma_syn**2)
 
-    unext = u0 + prefactor * (kappa_R - gci * chi_R_sq * uci)
-    gafter = lorentz_factor(unext)
+    unext = u0 + prefactor * (kappa_R - chi_R_sq * gci * uci)
+
+    gnext = lorentz_factor(unext)
     return unext
 
 
@@ -224,10 +228,10 @@ def radiate_inversecompton(u0: np.ndarray, u1: np.ndarray, Bnorm: float, beta_re
     uci = 0.5 * (u0 + u1)
     gci = lorentz_factor(uci)
 
-    prefactor = Bnorm * beta_rec / (cc * gamma_ic**2)
+    dummy = Bnorm * beta_rec / (cc * gamma_ic**2)
 
-    unext = u0 - prefactor * uci * gci
-    gafter = lorentz_factor(unext)
+    unext = u0 - dummy * uci * gci
+    gnext = lorentz_factor(unext)
     return unext
 
 

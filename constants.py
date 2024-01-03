@@ -24,6 +24,6 @@ Q_OVER_M = -1
 # TODO: the bottom two parameters are linked, should verify if we can define them independently (see tristan wiki: radiation)
 GAMMA_SYN = 10.  # synchrotron cooling rate
 GAMMA_IC = 10.  # synchrotron cooling rate
-BETA_REC = 1.0  # fiducial magnetic energy extraction rate
+BETA_REC = 0.1  # fiducial magnetic energy extraction rate
 
 FIELDNAMES = ["ex", "ey", "ez", "bx", "by", "bz"]

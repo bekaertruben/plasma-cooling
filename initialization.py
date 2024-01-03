@@ -102,3 +102,14 @@ def uniform_B():
     Bnorm = np.mean(fields["bz"])
 
     return fields, Bnorm
+
+
+def uniform_E():
+    default = np.zeros([N_CELLS for _ in range(3)], dtype=float)
+    fields = {field: np.array(default) for field in FIELDNAMES}
+
+    fields["ez"] = np.ones_like(fields["ez"]) * 10.
+
+    Bnorm = np.mean(fields["bz"])
+
+    return fields, Bnorm
