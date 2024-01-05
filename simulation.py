@@ -24,8 +24,6 @@ class Simulation():
     ----------
     N : int
         Number of particles.
-    T : float
-        Initial temperature of the particles.
     parameters : SimulationParameters
         Simulation parameters.
     fields : dict
@@ -48,7 +46,6 @@ class Simulation():
     """
 
     N: int
-    T: float
     parameters: SimulationParameters
     fields: Fields
     positions: np.ndarray
@@ -62,7 +59,6 @@ class Simulation():
             skip_particle_generation: bool = False
     ) -> None:
         self.N = N
-        self.T = T
         self.parameters = parameters
         if fields:
             self.fields = fields
@@ -70,23 +66,22 @@ class Simulation():
             self.fields = Fields.uniform_fields(self.parameters.edges_cells)
 
         if not skip_particle_generation:
-            self.generate_particles()
+            self.generate_particles(T)
 
-    def generate_particles(self) -> None:
+    def generate_particles(self, T) -> None:
         """ Generate `N` particles with temperature `T` and add them to the simulation. """
         # Sample particle positions uniformly over the simulation space
-        self.positions = np.random.rand(
-            self.N, 3) * self.parameters.edges_cells[np.newaxis, :]
+        self.positions = np.random.rand(self.N, 3) * self.parameters.edges_cells[np.newaxis, :]
 
         # Sample Lorentz factors from a thermal Maxwell-Jüttner distribution
-        idx = f'T={self.T}'
+        idx = f'T={T}'
         if idx in MJ_gammas.index and self.N <= MJ_gammas.loc[idx].size:
             gammas = MJ_gammas.loc[idx].sample(self.N).values
         else:
             mj = MaxwellJuttnerDistribution(
-                T=self.T,
-                # Approximation only works for large temperatures
-                approximation_order=1 if self.T > 100 else None
+                T=T,
+                # Approximation only works for large temperatures:
+                approximation_order=1 if T > 100 else None
             )
             gammas = mj.sample(self.N)
         us = np.sqrt(gammas**2 - 1)
@@ -147,7 +142,7 @@ class Simulation():
 
         sim = cls(
             N=positions.shape[0],
-            T=0,
+            T=None,
             parameters=SimulationParameters(*parameters),
             fields=Fields(edges_cells, E, B, Bnorm),
             skip_particle_generation=True

@@ -23,11 +23,11 @@ sim = Simulation(
 )
 
 x_hist = np.zeros((saves, N, 3))
-v_hist = np.zeros((saves, N, 3))
+u_hist = np.zeros((saves, N, 3))
 
 for i, positions, velocities in tqdm(sim.run(iterations, saves), total=saves, desc="Running simulation"):
     x_hist[i] = positions
-    v_hist[i] = velocities
+    u_hist[i] = velocities
 
 # # Plot a particle trajectory:
 # fig = plt.figure(figsize=(10, 10))
@@ -43,7 +43,7 @@ for i, positions, velocities in tqdm(sim.run(iterations, saves), total=saves, de
 # Plot the spread of particle velocities:
 fig = plt.figure(figsize=(10, 5))
 t = np.linspace(0, iterations, saves)
-us = np.linalg.norm(v_hist, axis=-1)
+us = np.linalg.norm(u_hist, axis=-1)
 plt.errorbar(t, us.mean(axis=-1), us.std(axis=-1), fmt='o', markersize=3)
 plt.xlabel("Iteration")
 plt.ylabel("Particle velocity spread")
