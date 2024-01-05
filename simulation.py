@@ -85,8 +85,8 @@ class Simulation():
         us = np.sqrt(gammas**2 - 1)
 
         # Sample directions from uniform spherical distribution
-        directions = np.random.randn((self.N, 3))
-        directions /= np.linalg.norm(directions, axis=-1)
+        directions = np.random.randn(self.N, 3)
+        directions /= np.linalg.norm(directions, axis=-1)[:, np.newaxis]
 
         self.velocities = us[:, np.newaxis] * directions
 
