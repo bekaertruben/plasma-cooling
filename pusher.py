@@ -1,119 +1,60 @@
 import numpy as np
 from scipy.ndimage import map_coordinates
 from typing import Optional
-from constants import *
+
+from fields import Fields
+from simulation_parameters import SimulationParameters
 
 
-def apply_periodicity(X0: np.ndarray, edges: np.ndarray):
-    """
-    X0: (3,N)
-
-    edges: (3,)
-        assumes boundaries of [(0,edge) for edge in edges]
-    """
-
-    return np.mod(X0, edges[:, np.newaxis])
-
-
-def interpolate_field(x0: np.ndarray, F: np.ndarray):
-    """
-    Interpolate F at x0
-
-    Arguments
-    ---------
-    x0: np.ndarray (shape: (*,3,N))
-        positions at which to interpolate F. Optional zeroth axis for multiple sets of positions (different sim iterations)
-
-    F: np.ndarray (shape: (N_CELLS, N_CELLS, N_CELLS))
-        field to interpolate
-
-    edges: np.ndarray (shape: (3,))
-        edges of the simulation box in meters
-
-    Returns
-    -------
-    F_interp: np.ndarray (shape: (*,N))
-        interpolated field at x0
-
-    """
-    if len(x0.shape) == 3:
-        # (3,*,N), if no copy a view is returned
-        x = np.array(np.swapaxes(x0, 0, 1), copy=True)
-        # weird bug I dont understand: if the below two lines are not seperated the results are wrong
-    elif len(x0.shape) == 2:
-        x = np.array(x0)
-    else:
-        raise ValueError(f"Invalid shape for x0 {x0.shape}")
-
-    F_interp = map_coordinates(F, x, order=1, mode='grid-wrap')
-    return F_interp
+def apply_periodicity(x: np.ndarray, edges: np.ndarray):
+    """ Wraps positions to the simulation box defined by edges """
+    return np.mod(x, edges)
 
 
 def lorentz_factor(u: np.ndarray):
-    """
-    Compute the lorentz factor of particles with velocity u.
+    """ Compute the lorentz factor of particles with velocity u. """
+    return np.sqrt(1 + np.sum(np.square(u), axis=-1))
+
+
+def boris_push(
+        x0: np.ndarray,
+        u0: np.ndarray,
+        fields: Fields,
+        sim_params: SimulationParameters
+        ):
+    """ Borish push (Lorentz force) on particles with velocity u0 and position x0.
 
     Arguments
     ---------
-    u: np.ndarray (shape: (*,3,N))
-        particle velocities. Dimension -2 is spatial
-
-    Returns
-    -------
-    gamma: np.ndarray (shape: (*,N))
-        lorentz factor
-    """
-
-    return np.sqrt(1 + np.sum(np.square(u), axis=-2))
-
-
-def boris_push(x0: np.ndarray, u0: np.ndarray, fields: dict, bnorm: float, cc: float = CC):
-    """
-    Borish push (Lorentz force) on particles with velocity u0 and position x0.
-
-    Arguments
-    ---------
-    x0: np.ndarray (shape: (3,N))
+    x0: np.ndarray (shape: (N,3))
         particle positions at step n
-
-    u0: np.ndarray (shape: (3,N))
+    u0: np.ndarray (shape: (N,3))
         particle velocities at step n - 1/2
-
-    fields: dict
-        keys must include 'ex','ey','ez','bx','by','bz'. The values are 3D arrays of shape (N_CELLS, N_CELLS, N_CELLS)
+    fields: Fields
+        the electric and magnetic fields (unaltered by the pusher)
+    sim_params: SimulationParameters
+        simulation parameters
 
     Returns
     -------
-    xnext: np.ndarray (shape: (3,N))
+    xnext: np.ndarray (shape: (N,3))
         particle positions at step n + 1
-
-    unext: np.ndarray (shape: (3,N))
+    unext: np.ndarray (shape: (N,3))
         particle velocities at step n + 1/2
-
-    Eci: np.ndarray (shape: (3,N))
+    Eci: np.ndarray (shape: (N,3))
         interpolated electric field at step n
-
-    Bci: np.ndarray (shape: (3,N))
+    Bci: np.ndarray (shape: (N,3))
         interpolated magnetic field at step n
-
     """
-    if set(fields.keys()) != set(FIELDNAMES):
-        raise KeyError(
-            f"`fields` keys ({fields.keys()}) does not corresponds with {FIELDNAMES}")
+    cc = sim_params.cc
+    Bnorm = fields.Bnorm
+    q_over_m = sim_params.q_over_m
 
-    xci = x0 + u0 / (2 * lorentz_factor(u0))
+    g0 = lorentz_factor(u0)[..., np.newaxis]
+    xci = x0 + u0 / (2 * g0)
+    Eci, Bci = fields.interpolate(xci)
 
-    # interpolate fields. if bottleneck could make it multiprocessed
-    fields_ci = {key: interpolate_field(xci, value)
-                 for key, value in fields.items()}
-
-    # fields_ci[key] is a (N,) shaped array
-
-    # Fci shape: (3,N)
-    Eci = np.array([fields_ci[key] for key in ["ex", "ey", "ez"]])
-    Bci = np.array([fields_ci[key] for key in ["bx", "by", "bz"]])
-
-    dummy = 0.5 * Q_OVER_M * bnorm
+    dummy = 0.5 * q_over_m * Bnorm
     e0 = Eci * dummy
     # dummy /= cc
     b0 = Bci * dummy
@@ -122,75 +63,65 @@ def boris_push(x0: np.ndarray, u0: np.ndarray, fields: dict, bnorm: float, cc: f
     u1prime = cc * u0 + e0
 
     # first half magnetic rotation
-    gamma1 = lorentz_factor(u1prime / cc)
-    f = 2. / (1. + np.sum(np.square(b0/(cc * gamma1)), axis=0))
-    u2prime = (u1prime + np.cross(u1prime/(cc * gamma1), b0, axis=0))*f
+    gamma1 = lorentz_factor(u1prime / cc)[..., np.newaxis]
+    f = 2. / (1. + np.sum(np.square(b0/(cc * gamma1)), axis=-1))[..., np.newaxis]
+    u2prime = (u1prime + np.cross(u1prime/(cc * gamma1), b0, axis=-1))*f
 
     # second half magnetic rotation + half acceleration
-    u3prime = u1prime + np.cross(u2prime/(cc * gamma1), b0, axis=0) + e0
+    u3prime = u1prime + np.cross(u2prime/(cc * gamma1), b0, axis=-1) + e0
     unext = u3prime / cc
-    xnext = xci + unext / (2 * lorentz_factor(unext))
+    gnext = lorentz_factor(unext)[..., np.newaxis]
+    xnext = xci + unext / (2 * gnext)
 
-    xnext = apply_periodicity(xnext, np.array(EDGES_CELLS))
+    xnext = apply_periodicity(xnext, sim_params.edges_cells)
 
     return xnext, unext, Eci, Bci
 
 
-def radiate_synchrotron(u0: np.ndarray,
-                        u1: np.ndarray,
-                        Eci: np.ndarray,
-                        Bci: np.ndarray,
-                        Bnorm: float,
-                        beta_rec: float,
-                        gamma_syn: float,
-                        cc: float = CC):
+def radiate_synchrotron(
+        u0: np.ndarray,
+        u1: np.ndarray,
+        Eci: np.ndarray,
+        Bci: np.ndarray,
+        Bnorm: float,
+        sim_params: SimulationParameters
+        ):
     """
     Compute the radiative drag on a particle due to synchrotron radiation.
 
     Arguments
     ---------
-    u0: np.ndarray (shape: (3,N))
+    u0: np.ndarray (shape: (N,3))
         particle velocities at step n - 1/2
-
-    u1: np.ndarray (shape: (3,N))
+    u1: np.ndarray (shape: (N,3))
         particle velocities at step n + 1/2 from the unmodified Boris pusher
-
-    Eci: np.ndarray (shape: (3,N))
+    Eci: np.ndarray (shape: (N,3))
         interpolated electric field at step n
-
-    Bci: np.ndarray (shape: (3,N))
+    Bci: np.ndarray (shape: (N,3))
         interpolated magnetic field at step n
-
     Bnorm: float
         average z magnetic field
-
-    beta_rec: float
-        fiducial magnetic energy extraction rate
-
-    gamma_syn: float
-        typical lorentz factor for synchrotron drag
+    sim_params: SimulationParameters
+        simulation parameters (require gamma_syn, beta_rec, cc)
 
     Returns
     -------
-    unext: np.ndarray (shape: (3,N))
+    unext: np.ndarray (shape: (N,3))
         synchrotron dragged particle velocities at step n + 1/2
 
     """
-    g0 = lorentz_factor(u0)
-    g1 = lorentz_factor(u1)
-
     uci = 0.5 * (u0 + u1)
-    gci = lorentz_factor(uci)
+    gci = lorentz_factor(uci)[..., np.newaxis]
     betaci = uci / gci
 
-    Ebar = Eci + np.cross(betaci, Bci, axis=0)
+    Ebar = Eci + np.cross(betaci, Bci, axis=-1)
 
-    beta_dot_e = np.einsum("ji,ji->i", betaci, Eci)
+    beta_dot_e = np.einsum("ij,ij->i", betaci, Eci)[..., np.newaxis]
 
-    kappa_R = np.cross(Ebar, Bci, axis=0) + beta_dot_e * Eci
-    chi_R_sq = np.sum(np.square(Ebar), axis=0) - beta_dot_e**2
+    kappa_R = np.cross(Ebar, Bci, axis=-1) + beta_dot_e * Eci
+    chi_R_sq = np.sum(np.square(Ebar), axis=-1)[:, np.newaxis] - beta_dot_e**2
 
-    prefactor = Bnorm * beta_rec / (cc * gamma_syn**2)
+    prefactor = Bnorm * sim_params.beta_rec / (sim_params.cc * sim_params.gamma_syn**2)
 
     unext = u0 + prefactor * (kappa_R - chi_R_sq * gci * uci)
 
@@ -198,73 +129,64 @@ def radiate_synchrotron(u0: np.ndarray,
     return unext
 
 
-def radiate_inversecompton(u0: np.ndarray, u1: np.ndarray, Bnorm: float, beta_rec: float, gamma_ic: float, cc: float = CC):
+def radiate_inversecompton(
+        u0: np.ndarray,\
+        u1: np.ndarray,
+        Bnorm: float,
+        sim_params: SimulationParameters
+        ):
     """
     Compute the radiative drag on a particle due to inverse compton radiation.
 
     Arguments
     ---------
-    u0: np.ndarray (shape: (3,N))
+    u0: np.ndarray (shape: (N, 3))
         particle velocities at step n - 1/2
 
-    u1: np.ndarray (shape: (3,N))
+    u1: np.ndarray (shape: (N, 3))
         particle velocities at step n + 1/2 from the unmodified Boris pusher
 
     Bnorm: float
         average z magnetic field
 
-    beta_rec: float
-        fiducial magnetic energy extraction rate
-
-    gamma_ic: float
-        typical lorentz factor for inverse compton drag
+    sim_params: SimulationParameters
+        simulation parameters (require gamma_ic, cc)
 
     Returns
     -------
-    unext: np.ndarray (shape: (3,N))
+    unext: np.ndarray (shape: (N, 3))
         inverse compton dragged particle velocities at step n + 1/2
 
     """
     uci = 0.5 * (u0 + u1)
-    gci = lorentz_factor(uci)
+    gci = lorentz_factor(uci)[..., np.newaxis]
 
-    dummy = Bnorm * beta_rec / (cc * gamma_ic**2)
+    dummy = Bnorm * sim_params.beta_rec / (sim_params.cc * sim_params.gamma_ic**2)
 
     unext = u0 - dummy * uci * gci
-    gnext = lorentz_factor(unext)
+    # gnext = lorentz_factor(unext)
     return unext
 
 
-def push(x0: np.ndarray,
-         u0: np.ndarray,
-         fields: dict,
-         gamma_drag: dict,
-         beta_rec: float,
-         Bnorm: Optional[float] = None,
-         cc: float = CC):
-    """
-    Combine the unmodified Boris pusher with radiative drag (inverse compton and synchrotron).
+def push(
+        x0: np.ndarray,
+        u0: np.ndarray,
+        fields: Fields,
+        sim_params: SimulationParameters
+        ):
+    """ Combine the unmodified Boris pusher with radiative drag (inverse compton and synchrotron).
     This pusher assumes a dominant contribution from the Lorentz force, such that no modified pusher is needed.
 
     Arguments
     ---------
-    x0: np.ndarray (shape: (3,N))
+    x0: np.ndarray (shape: (N,3))
         particle positions at step n
-
-    u0: np.ndarray (shape: (3,N))
+    u0: np.ndarray (shape: (N,3))
         particle velocities at step n - 1/2
-
     fields: dict
         keys must include 'ex','ey','ez','bx','by','bz'. The values are 3D arrays of shape (N_CELLS, N_CELLS, N_CELLS)
-
-    gamma_drag: dict
-        dictionary with keys "syn" and "ic" and values of the typical lorentz factors for synchrotron and inverse compton drag. If a key is missing, the corresponding drag is not applied.
-
-    edges_meter: np.ndarray (shape: (3,))
-        edges of the simulation box in meters
-
-    Bnorm: Optional[float]
-        normalization of the magnetic field. If None, the mean of the magnetic field in the z direction is used.
+    sim_params: SimulationParameters
+        simulation parameters
 
     Returns
     -------
@@ -275,24 +197,19 @@ def push(x0: np.ndarray,
         particle velocities at step n + 1/2
 
     """
-    if Bnorm is None:
-        Bnorm = np.mean(fields["bz"])
+    xnext, u_lorentz, Eci, Bci = boris_push(x0, u0, fields, sim_params)
 
-    xnext, u_lorentz, Eci, Bci = boris_push(x0, u0, fields, Bnorm, cc)
-
-    syn_drag = "syn" in gamma_drag.keys()
-    ic_drag = "ic" in gamma_drag.keys()
+    syn_drag = sim_params.gamma_syn != None
+    ic_drag = sim_params.gamma_ic != None
 
     if not syn_drag and not ic_drag:
         return xnext, u_lorentz
 
     if syn_drag:
-        u_syn = radiate_synchrotron(
-            u0, u_lorentz, Eci, Bci, Bnorm, beta_rec, gamma_drag["syn"], cc)
+        u_syn = radiate_synchrotron(u0, u_lorentz, Eci, Bci, fields.Bnorm, sim_params)
 
     if ic_drag:
-        u_ic = radiate_inversecompton(
-            u0, u_lorentz, Bnorm, beta_rec, gamma_drag["ic"], cc)
+        u_ic = radiate_inversecompton(u0, u_lorentz, fields.Bnorm, sim_params)
 
     if syn_drag and not ic_drag:
         unext = u_lorentz + u_syn - u0
@@ -306,11 +223,13 @@ def push(x0: np.ndarray,
     return xnext, unext
 
 
-def transferred_power(velocity: np.ndarray,
-                      Eci: Optional[np.ndarray] = None,
-                      Bci: Optional[np.ndarray] = None,
-                      fields: Optional[dict] = None,
-                      position: Optional[np.ndarray] = None):
+def transferred_power(
+        velocity: np.ndarray,
+        Eci: Optional[np.ndarray] = None,
+        Bci: Optional[np.ndarray] = None,
+        fields: Optional[dict] = None,
+        position: Optional[np.ndarray] = None
+        ):
     """
     Get the parallel and perpendicular power transferred from field to particle.
 
@@ -319,25 +238,25 @@ def transferred_power(velocity: np.ndarray,
     charge: float or list[float]
         particle charge in Coulomb
 
-    velocity: np.ndarray (shape: (**, 3, N))
+    velocity: np.ndarray (shape: (..., 3))
         particle velocities at step n + 1/2
 
-    Eci: Optional[np.ndarray] (shape: (**, 3, N)) (default: None)
+    Eci: Optional[np.ndarray] (shape: (..., 3)) (default: None)
         interpolated electric field at steps n. If None, fields and position must be passed.
 
-    Bci: Optional[np.ndarray] (shape: (**, 3, N)) (default: None)
+    Bci: Optional[np.ndarray] (shape: (..., 3)) (default: None)
         interpolated magnetic field at steps n. If None, fields and position must be passed.
 
     fields: Optional[dict] (default: None)
         keys must include 'ex','ey','ez','bx','by','bz'. The values are 3D arrays of shape (N_CELLS, N_CELLS, N_CELLS).
         If None, Eci and Bci must be passed.
 
-    position: Optional[np.ndarray] (shape: (**, 3, N)) (default: None)
+    position: Optional[np.ndarray] (shape: (..., 3)) (default: None)
         particle positions at steps n. If None, Eci and Bci must be passed.
 
     Returns
     -------
-    Ppar / Pperp: np.ndarray (shape: (**, N))
+    Ppar / Pperp: np.ndarray (shape: (...))
         ratio parallel over perpendicular power
 
     """
@@ -357,17 +276,22 @@ def transferred_power(velocity: np.ndarray,
     # Epar = np.diag(Eci.T @ Bci) * Bci / \
     #     np.linalg.norm(Bci, axis=len(Bci.shape)-2) ** 2
     normalization = np.linalg.norm(Bci, axis=-2) ** 2
-    Epar = np.einsum("...ji,...ji,...ki->...ki", Eci, Bci, Bci)
+    Epar = np.einsum("...ij,...ij,...ik->...ik", Eci, Bci, Bci)
     Epar /= normalization[:, np.newaxis, :]
     Eperp = Eci - Epar
 
-    Ppar = np.einsum("...ji,...ji -> ...i", velocity, Epar)
-    Pperp = np.einsum("...ji,...ji -> ...i", velocity, Eperp)
+    Ppar = np.einsum("...ij,...ij -> ...i", velocity, Epar)
+    Pperp = np.einsum("...ij,...ij -> ...i", velocity, Eperp)
 
     return Ppar / Pperp
 
 
-def pitch_angle(u: np.ndarray, Bci: Optional[np.ndarray] = None, fields: Optional[dict] = None, position: Optional[np.ndarray] = None):
+def pitch_angle(
+        u: np.ndarray,
+        Bci: Optional[np.ndarray] = None,
+        fields: Optional[dict] = None,
+        position: Optional[np.ndarray] = None
+        ):
     """
     Get the pitch angle of the particle.
 
@@ -400,4 +324,4 @@ def pitch_angle(u: np.ndarray, Bci: Optional[np.ndarray] = None, fields: Optiona
                      for key in ["bx", "by", "bz"]}
         Bci = np.array([fields_ci[key] for key in ["bx", "by", "bz"]])
 
-    return np.arccos(np.einsum("...ji, ...ji -> ...i", u, Bci) / (np.linalg.norm(u, axis=-2) * np.linalg.norm(Bci, axis=-2)))
+    return np.arccos(np.einsum("...ij, ...ij -> ...i", u, Bci) / (np.linalg.norm(u, axis=-1) * np.linalg.norm(Bci, axis=-1)))

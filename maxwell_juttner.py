@@ -68,7 +68,7 @@ class MaxwellJuttnerDistribution:
     The CDF is calculated through numerical integration of the PDF, or approximated.
 
     The approximation using a Laurent series in the integral is extremely accurate for T >> 1, even at order 1.
-    At low temperatures, instead the Puiseux expansion of the CDF is used.
+    At low temperatures, one can instead choose to use the Puiseux expansion of the CDF.
 
     Args:
         T (float): the temperature of the distribution in units of mc^2 / k_B
