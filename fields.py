@@ -1,8 +1,6 @@
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
-from scipy.ndimage import map_coordinates
 import h5py
-from typing import Optional
 
 
 class Fields:
@@ -19,26 +17,29 @@ class Fields:
     """
 
     def __init__(self,
-                edges_cells: np.ndarray,
-                E : np.ndarray,
-                B : np.ndarray,
-                Bnorm: float,
-            ) -> None:
+                 edges_cells: np.ndarray,
+                 E: np.ndarray,
+                 B: np.ndarray,
+                 Bnorm: float,
+                 ) -> None:
         self.edges_cells = edges_cells
         self.E = E
         self.B = B
         self.Bnorm = Bnorm
-        
+
         # The wrapped fields are needed for interpolation
-        self._E_wrapped = np.pad(E, ((0, 1), (0, 1), (0, 1), (0,0)), mode='wrap') 
-        self._B_wrapped = np.pad(B, ((0, 1), (0, 1), (0, 1), (0,0)), mode='wrap')
-    
+        self._E_wrapped = np.pad(
+            E, ((0, 1), (0, 1), (0, 1), (0, 0)), mode='wrap')
+        self._B_wrapped = np.pad(
+            B, ((0, 1), (0, 1), (0, 1), (0, 0)), mode='wrap')
+
     @classmethod
     def uniform_fields(cls, edges_cells: np.ndarray, E0: np.ndarray = np.zeros(3), B0: np.ndarray = np.zeros(3)):
         """ Creates a uniform fields object """
         assert E0.shape == (3,), "E0 must be a 3D vector"
         assert B0.shape == (3,), "B0 must be a 3D vector"
-        assert edges_cells.shape == (3,) and edges_cells.dtype == int, "edges_cells must be an array of 3 integers"
+        assert edges_cells.shape == (
+            3,) and edges_cells.dtype == int, "edges_cells must be an array of 3 integers"
         B_norm = B0[-1]
         if B_norm != 0:
             E = np.ones([*edges_cells, 3]) * E0 / B_norm
@@ -48,7 +49,7 @@ class Fields:
             E = np.ones([*edges_cells, 3]) * E0
             B = np.ones([*edges_cells, 3]) * B0
         return cls(edges_cells, E, B, B_norm)
-    
+
     @classmethod
     def from_file(cls, path: str = "data/flds.tot.00410"):
         """ Loads the turbulent fields provided by Daniel """
@@ -90,13 +91,16 @@ class Fields:
         if wrap:
             positions = np.mod(positions, self.edges_cells)
         else:
-            assert np.all(positions >= 0) and np.all(positions < self.edges_cells), "Positions must be within the simulation space"
+            assert np.all(positions >= 0) and np.all(
+                positions < self.edges_cells), "Positions must be within the simulation space"
 
         range_x = np.arange(self.edges_cells[0] + 1)
         range_y = np.arange(self.edges_cells[1] + 1)
         range_z = np.arange(self.edges_cells[2] + 1)
 
-        E_interpolator = RegularGridInterpolator((range_x, range_y, range_z), self._E_wrapped)
-        B_interpolator = RegularGridInterpolator((range_x, range_y, range_z), self._B_wrapped)
+        E_interpolator = RegularGridInterpolator(
+            (range_x, range_y, range_z), self._E_wrapped)
+        B_interpolator = RegularGridInterpolator(
+            (range_x, range_y, range_z), self._B_wrapped)
 
         return E_interpolator(positions), B_interpolator(positions)
