@@ -85,14 +85,8 @@ class Simulation():
         us = np.sqrt(gammas**2 - 1)
 
         # Sample directions from uniform spherical distribution
-        phi = np.random.uniform(0, np.pi*2, size=self.N)
-        costheta = np.random.uniform(-1, 1, size=self.N)
-        theta = np.arccos(costheta)
-        directions = np.array([
-            np.sin(theta) * np.cos(phi),
-            np.sin(theta) * np.sin(phi),
-            np.cos(theta)
-        ]).T
+        directions = np.random.randn((self.N, 3))
+        directions /= np.linalg.norm(directions, axis=-1)
 
         self.velocities = us[:, np.newaxis] * directions
 
