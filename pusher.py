@@ -47,14 +47,12 @@ def boris_push(
         interpolated magnetic field at step n
     """
     cc = sim_params.cc
-    Bnorm = fields.Bnorm
-    q_over_m = sim_params.q_over_m
 
     g0 = lorentz_factor(u0)[..., np.newaxis]
     xci = x0 + u0 / (2 * g0)
     Eci, Bci = fields.interpolate(xci)
 
-    dummy = 0.5 * q_over_m * Bnorm
+    dummy = 0.5 * sim_params.q_over_m * fields.Bnorm
     e0 = Eci * dummy
     # dummy /= cc
     b0 = Bci * dummy
