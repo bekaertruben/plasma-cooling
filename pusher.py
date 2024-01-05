@@ -1,5 +1,4 @@
 import numpy as np
-from scipy.ndimage import map_coordinates
 from typing import Optional
 
 from fields import Fields
@@ -17,11 +16,11 @@ def lorentz_factor(u: np.ndarray):
 
 
 def boris_push(
-        x0: np.ndarray,
+        xci: np.ndarray,
         u0: np.ndarray,
         fields: Fields,
         sim_params: SimulationParameters
-        ):
+):
     """ Borish push (Lorentz force) on particles with velocity u0 and position x0.
 
     Arguments
@@ -48,13 +47,10 @@ def boris_push(
     """
     cc = sim_params.cc
 
-    g0 = lorentz_factor(u0)[..., np.newaxis]
-    xci = x0 + u0 / (2 * g0)
     Eci, Bci = fields.interpolate(xci)
 
     dummy = 0.5 * sim_params.q_over_m * fields.Bnorm
     e0 = Eci * dummy
-    # dummy /= cc
     b0 = Bci * dummy
 
     # half acceleration
@@ -62,18 +58,15 @@ def boris_push(
 
     # first half magnetic rotation
     gamma1 = lorentz_factor(u1prime / cc)[..., np.newaxis]
-    f = 2. / (1. + np.sum(np.square(b0/(cc * gamma1)), axis=-1))[..., np.newaxis]
+    f = 2. / (1. + np.sum(np.square(b0/(cc * gamma1)), axis=-1)
+              )[..., np.newaxis]
     u2prime = (u1prime + np.cross(u1prime/(cc * gamma1), b0, axis=-1))*f
 
     # second half magnetic rotation + half acceleration
     u3prime = u1prime + np.cross(u2prime/(cc * gamma1), b0, axis=-1) + e0
     unext = u3prime / cc
-    gnext = lorentz_factor(unext)[..., np.newaxis]
-    xnext = xci + unext / (2 * gnext)
 
-    xnext = apply_periodicity(xnext, sim_params.edges_cells)
-
-    return xnext, unext, Eci, Bci
+    return unext, Eci, Bci
 
 
 def radiate_synchrotron(
@@ -83,7 +76,7 @@ def radiate_synchrotron(
         Bci: np.ndarray,
         Bnorm: float,
         sim_params: SimulationParameters
-        ):
+):
     """
     Compute the radiative drag on a particle due to synchrotron radiation.
 
@@ -119,7 +112,8 @@ def radiate_synchrotron(
     kappa_R = np.cross(Ebar, Bci, axis=-1) + beta_dot_e * Eci
     chi_R_sq = np.sum(np.square(Ebar), axis=-1)[:, np.newaxis] - beta_dot_e**2
 
-    prefactor = Bnorm * sim_params.beta_rec / (sim_params.cc * sim_params.gamma_syn**2)
+    prefactor = Bnorm * sim_params.beta_rec / \
+        (sim_params.cc * sim_params.gamma_syn**2)
 
     unext = u0 + prefactor * (kappa_R - chi_R_sq * gci * uci)
 
@@ -128,11 +122,11 @@ def radiate_synchrotron(
 
 
 def radiate_inversecompton(
-        u0: np.ndarray,\
+        u0: np.ndarray,
         u1: np.ndarray,
         Bnorm: float,
         sim_params: SimulationParameters
-        ):
+):
     """
     Compute the radiative drag on a particle due to inverse compton radiation.
 
@@ -159,10 +153,10 @@ def radiate_inversecompton(
     uci = 0.5 * (u0 + u1)
     gci = lorentz_factor(uci)[..., np.newaxis]
 
-    dummy = Bnorm * sim_params.beta_rec / (sim_params.cc * sim_params.gamma_ic**2)
+    dummy = Bnorm * sim_params.beta_rec / \
+        (sim_params.cc * sim_params.gamma_ic**2)
 
     unext = u0 - dummy * uci * gci
-    # gnext = lorentz_factor(unext)
     return unext
 
 
@@ -171,7 +165,7 @@ def push(
         u0: np.ndarray,
         fields: Fields,
         sim_params: SimulationParameters
-        ):
+):
     """ Combine the unmodified Boris pusher with radiative drag (inverse compton and synchrotron).
     This pusher assumes a dominant contribution from the Lorentz force, such that no modified pusher is needed.
 
@@ -195,29 +189,35 @@ def push(
         particle velocities at step n + 1/2
 
     """
-    xnext, u_lorentz, Eci, Bci = boris_push(x0, u0, fields, sim_params)
+    g0 = lorentz_factor(u0)[..., np.newaxis]
+    xci = x0 + u0 / (2 * g0)
+    u_lorentz, Eci, Bci = boris_push(x0, u0, fields, sim_params)
 
     syn_drag = sim_params.gamma_syn != None
     ic_drag = sim_params.gamma_ic != None
 
-    if not syn_drag and not ic_drag:
-        return xnext, u_lorentz
-
     if syn_drag:
-        u_syn = radiate_synchrotron(u0, u_lorentz, Eci, Bci, fields.Bnorm, sim_params)
+        u_syn = radiate_synchrotron(
+            u0, u_lorentz, Eci, Bci, fields.Bnorm, sim_params)
 
     if ic_drag:
         u_ic = radiate_inversecompton(u0, u_lorentz, fields.Bnorm, sim_params)
 
-    if syn_drag and not ic_drag:
+    if not syn_drag and not ic_drag:
+        unext = u_lorentz
+
+    elif syn_drag and not ic_drag:
         unext = u_lorentz + u_syn - u0
-        return xnext, unext
 
     elif ic_drag and not syn_drag:
         unext = u_lorentz + u_ic - u0
-        return xnext, unext
 
-    unext = u_lorentz + u_syn + u_ic - 2 * u0
+    elif ic_drag and syn_drag:
+        unext = u_lorentz + u_syn + u_ic - 2 * u0
+
+    gnext = lorentz_factor(unext)[..., np.newaxis]
+    xnext = xci + unext / (2 * gnext)
+    xnext = apply_periodicity(xnext, sim_params.edges_cells)
     return xnext, unext
 
 
@@ -227,7 +227,7 @@ def transferred_power(
         Bci: Optional[np.ndarray] = None,
         fields: Optional[dict] = None,
         position: Optional[np.ndarray] = None
-        ):
+):
     """
     Get the parallel and perpendicular power transferred from field to particle.
 
@@ -289,7 +289,7 @@ def pitch_angle(
         Bci: Optional[np.ndarray] = None,
         fields: Optional[dict] = None,
         position: Optional[np.ndarray] = None
-        ):
+):
     """
     Get the pitch angle of the particle.
 
