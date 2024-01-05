@@ -6,6 +6,7 @@ test.ipynb
 pickles
 .vscode
 requirements*.lock 
+*.prof
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

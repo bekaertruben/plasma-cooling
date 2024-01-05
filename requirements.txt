@@ -2,6 +2,6 @@ numpy
 scipy
 mpmath
 h5py
-# pandas
+pandas
 matplotlib
 tqdm

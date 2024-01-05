@@ -1,11 +1,20 @@
 import numpy as np
+import pandas as pd
 import h5py
+import os
 from typing import Optional
 
 from simulation_parameters import SimulationParameters
 from maxwell_juttner import MaxwellJuttnerDistribution
 from fields import Fields
 import pusher
+
+
+# Load precomputed Maxwell-Jüttner gamma samples
+if os.path.exists('data/MJ_gammas.csv'):
+    MJ_gammas = pd.read_csv('data/MJ_gammas.csv', index_col=0)
+else:
+    MJ_gammas = pd.DataFrame()
 
 
 class Simulation():
@@ -53,20 +62,26 @@ class Simulation():
             self.fields = fields
         else:
             self.fields = Fields.uniform_fields(self.parameters.edges_cells)
-        
+
         self.generate_particles()
-    
+
     def generate_particles(self) -> None:
         """ Generate `N` particles with temperature `T` and add them to the simulation. """
         # Sample particle positions uniformly over the simulation space
-        self.positions = np.random.rand(self.N, 3) * self.parameters.edges_cells[np.newaxis, :]
+        self.positions = np.random.rand(
+            self.N, 3) * self.parameters.edges_cells[np.newaxis, :]
 
         # Sample Lorentz factors from a thermal Maxwell-Jüttner distribution
-        mj = MaxwellJuttnerDistribution(
-            T = self.T,
-            approximation_order = 1 if self.T > 100 else None # Approximation only works for large temperatures
-        )
-        gammas = mj.sample(self.N)
+        idx = f'T={self.T}'
+        if idx in MJ_gammas.index and self.N <= MJ_gammas.loc[idx].size:
+            gammas = MJ_gammas.loc[idx].sample(self.N).values
+        else:
+            mj = MaxwellJuttnerDistribution(
+                T=self.T,
+                # Approximation only works for large temperatures
+                approximation_order=1 if self.T > 100 else None
+            )
+            gammas = mj.sample(self.N)
         us = np.sqrt(gammas**2 - 1)
 
         # Sample directions from uniform spherical distribution
@@ -90,7 +105,7 @@ class Simulation():
             self.parameters
         )
 
-    def run(self, steps: int, num_snapshots: int = None):
+    def run(self, steps: int, num_snapshots: Optional[int] = None):
         """ Generator running the simulation for `steps` iterations and yielding the positions and velocities every iteration.
         If `num_snapshots` is not None, it will instead return the positions and velocities only that many times.
         """
@@ -102,8 +117,9 @@ class Simulation():
         for i in range(steps):
             self.step()
             if i in snapshots:
-                yield i, self.positions, self.velocities
-        
+                nth_snapshot = np.where(snapshots == i)
+                yield nth_snapshot, self.positions, self.velocities
+
     def save(self, path: str) -> None:
         """ Save the simulation to a file. """
         with h5py.File(path, 'w') as file:
@@ -113,43 +129,47 @@ class Simulation():
             file.create_dataset("parameters", data=self.parameters)
 
 
-
 if __name__ == "__main__":
     from tqdm import tqdm
+    import matplotlib.pyplot as plt
+    import matplotlib.cm as cm
+    plt.style.use("ggplot")
+
+    N = 10_000
+    iterations = 1000
+    saves = 100
 
     sim = Simulation(
-        N = 100,
-        T = 1,
-        fields = Fields.uniform_fields(np.array([100, 100, 100]), B0 = np.array([0, 0, 1])),
-        # fields = Fields.from_file(),
-        parameters = SimulationParameters(gamma_syn = None, gamma_ic = None, cc = 0.45),
+        N=N,
+        T=1000,
+        # fields = Fields.uniform_fields(np.array([100, 100, 100]), B0 = np.array([0, 0, 1])),
+        fields=Fields.from_file(),
+        parameters=SimulationParameters(
+            gamma_syn=None, gamma_ic=None, cc=0.45),
     )
-
-    sim.positions[0] = [50, 50, 50]
-    sim.velocities[0] = [10, 0, 1]
 
     g = pusher.lorentz_factor(sim.velocities)
 
-    iterations = 100
-    x_hist = np.zeros((iterations+1, 3))
-    x_hist[0] = sim.positions[0]
-    for i, positions, velocities in tqdm(sim.run(iterations), total=iterations, desc="Running simulation"):
-        x_hist[i+1] = positions[0]
-    
-    print(x_hist[0], x_hist[-1])
-
-    import matplotlib.pyplot as plt
-    import matplotlib.cm as cm
-
-    plt.style.use("ggplot")
+    x_hist = np.zeros((saves, N, 3))
+    v_hist = np.zeros((saves, N, 3))
+    for i, positions, velocities in tqdm(sim.run(iterations, saves), total=saves, desc="Running simulation"):
+        x_hist[i] = positions
+        v_hist[i] = velocities
 
     fig = plt.figure(figsize=(10, 10))
-    ax = fig.add_subplot(projection='3d')
-    ax.set_title("Particle trajectory [red -> purple]")
 
-    c = np.linspace(1, 0, iterations+1)
-    for i in range(iterations):
-        ax.plot(x_hist[i:i+2, 0], x_hist[i:i+2, 1], x_hist[i:i+2, 2], color=cm.rainbow(c[i]))
+    # # Plot a particle trajectory:
+    # ax = fig.add_subplot(projection='3d')
+    # ax.set_title("Particle trajectory [red -> purple]")
 
-    plt.legend()
-    plt.show()
+    # c = np.linspace(1, 0, iterations)
+    # for i in range(iterations):
+    #     ax.plot(x_hist[i:i+2, 0, 0], x_hist[i:i+2, 0, 1], x_hist[i:i+2, 0, 2], color=cm.rainbow(c[i]))
+
+    # # Plot the spread of particle velocities:
+    # t = np.linspace(0, iterations, saves)
+    # us = np.linalg.norm(v_hist, axis=-1)
+    # plt.errorbar(t, us.mean(axis=-1), us.std(axis=-1), label="velocity spread")
+
+    # plt.legend()
+    # plt.show()

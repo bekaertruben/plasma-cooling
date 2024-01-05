@@ -272,7 +272,7 @@ def transferred_power(
             Bci = np.swapaxes(Bci, 0, 1)
 
     # Epar = np.diag(Eci.T @ Bci) * Bci / \
-    #     np.linalg.norm(Bci, axis=len(Bci.shape)-2) ** 2
+    #     np.linalg.norm(Bci, axis=len(Bci.shape)-1) ** 2
     normalization = np.linalg.norm(Bci, axis=-2) ** 2
     Epar = np.einsum("...ij,...ij,...ik->...ik", Eci, Bci, Bci)
     Epar /= normalization[:, np.newaxis, :]
@@ -295,21 +295,21 @@ def pitch_angle(
 
     Arguments
     ---------
-    u: np.ndarray (shape: (**,3,N))
+    u: np.ndarray (shape: (...,3))
         particle velocities at step n + 1/2
 
-    Bci: Optional[np.ndarray] (shape: (**,3,N)) (default: None)
+    Bci: Optional[np.ndarray] (shape: (...,3)) (default: None)
         interpolated magnetic field at step n. If None, fields and position must be passed.
 
     fields: Optional[dict] (default: None)
         keys must include 'ex','ey','ez','bx','by','bz'. The values are 3D arrays of shape (N_CELLS, N_CELLS, N_CELLS). If None, Bci must be passed.
 
-    position: Optional[np.ndarray] (shape: (**,3,N)) (default: None)
+    position: Optional[np.ndarray] (shape: (...,3)) (default: None)
         particle positions at step n. If None, Bci must be passed.
 
     Returns
     -------
-    pitch_angle: np.ndarray (shape: (**,N))
+    pitch_angle: np.ndarray (shape: (...,3))
         pitch angle of the particle
 
     """

@@ -28,6 +28,10 @@ class Fields:
         self.E = E
         self.B = B
         self.Bnorm = Bnorm
+        
+        # The wrapped fields are needed for interpolation
+        self._E_wrapped = np.pad(E, ((0, 1), (0, 1), (0, 1), (0,0)), mode='wrap') 
+        self._B_wrapped = np.pad(B, ((0, 1), (0, 1), (0, 1), (0,0)), mode='wrap')
     
     @classmethod
     def uniform_fields(cls, edges_cells: np.ndarray, E0: np.ndarray = np.zeros(3), B0: np.ndarray = np.zeros(3)):
@@ -92,11 +96,8 @@ class Fields:
         range_y = np.arange(self.edges_cells[1] + 1)
         range_z = np.arange(self.edges_cells[2] + 1)
 
-        E_wrapped = np.pad(self.E, ((0, 1), (0, 1), (0, 1), (0,0)), mode='wrap')
-        B_wrapped = np.pad(self.B, ((0, 1), (0, 1), (0, 1), (0,0)), mode='wrap')
-
-        E_interpolator = RegularGridInterpolator((range_x, range_y, range_z), E_wrapped)
-        B_interpolator = RegularGridInterpolator((range_x, range_y, range_z), B_wrapped)
+        E_interpolator = RegularGridInterpolator((range_x, range_y, range_z), self._E_wrapped)
+        B_interpolator = RegularGridInterpolator((range_x, range_y, range_z), self._B_wrapped)
 
         return E_interpolator(positions), B_interpolator(positions)
 
