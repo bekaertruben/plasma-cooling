@@ -118,14 +118,15 @@ if __name__ == "__main__":
     from tqdm import tqdm
 
     sim = Simulation(
-        N = 1,
+        N = 100,
         T = 1,
         fields = Fields.uniform_fields(np.array([100, 100, 100]), B0 = np.array([0, 0, 1])),
-        parameters = SimulationParameters(gamma_syn = None, gamma_ic = None, cc = 0.05),
+        # fields = Fields.from_file(),
+        parameters = SimulationParameters(gamma_syn = None, gamma_ic = None, cc = 0.45),
     )
 
     sim.positions[0] = [50, 50, 50]
-    sim.velocities[0] = 0.1 * np.ones(3)
+    sim.velocities[0] = [10, 0, 1]
 
     g = pusher.lorentz_factor(sim.velocities)
 
@@ -135,16 +136,20 @@ if __name__ == "__main__":
     for i, positions, velocities in tqdm(sim.run(iterations), total=iterations, desc="Running simulation"):
         x_hist[i+1] = positions[0]
     
+    print(x_hist[0], x_hist[-1])
+
     import matplotlib.pyplot as plt
+    import matplotlib.cm as cm
+
     plt.style.use("ggplot")
 
     fig = plt.figure(figsize=(10, 10))
-    # ax = fig.add_subplot(projection='3d')
+    ax = fig.add_subplot(projection='3d')
+    ax.set_title("Particle trajectory [red -> purple]")
 
-    t = np.linspace(0, 1, iterations+1)
-    plt.plot(t, x_hist[:, 0], label="x")
-    plt.plot(t, x_hist[:, 1], label="y")
-    # plt.plot(t, x_hist[:, 2], label="z")
+    c = np.linspace(1, 0, iterations+1)
+    for i in range(iterations):
+        ax.plot(x_hist[i:i+2, 0], x_hist[i:i+2, 1], x_hist[i:i+2, 2], color=cm.rainbow(c[i]))
 
     plt.legend()
     plt.show()
