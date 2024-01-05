@@ -40,7 +40,3 @@ class SimulationParameters:
     @property
     def edges_cells(self):
         return np.array([self.n_cells, self.n_cells, self.n_cells])
-
-
-if __name__ == "__main__":
-    print(SimulationParameters(cc=0.9))

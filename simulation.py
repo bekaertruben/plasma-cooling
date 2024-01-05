@@ -110,7 +110,7 @@ class Simulation():
         If `num_snapshots` is not None, it will instead return the positions and velocities only that many times.
         """
         if num_snapshots:
-            snapshots = np.linspace(0, steps, num_snapshots, dtype=int)
+            snapshots = np.linspace(0, steps-1, num_snapshots, dtype=int)
         else:
             snapshots = np.arange(steps)
 
@@ -127,49 +127,3 @@ class Simulation():
             file.create_dataset("velocities", data=self.velocities)
             file.create_dataset("fields", data=self.fields)
             file.create_dataset("parameters", data=self.parameters)
-
-
-if __name__ == "__main__":
-    from tqdm import tqdm
-    import matplotlib.pyplot as plt
-    import matplotlib.cm as cm
-    plt.style.use("ggplot")
-
-    N = 10_000
-    iterations = 1000
-    saves = 100
-
-    sim = Simulation(
-        N=N,
-        T=1000,
-        # fields = Fields.uniform_fields(np.array([100, 100, 100]), B0 = np.array([0, 0, 1])),
-        fields=Fields.from_file(),
-        parameters=SimulationParameters(
-            gamma_syn=None, gamma_ic=None, cc=0.45),
-    )
-
-    g = pusher.lorentz_factor(sim.velocities)
-
-    x_hist = np.zeros((saves, N, 3))
-    v_hist = np.zeros((saves, N, 3))
-    for i, positions, velocities in tqdm(sim.run(iterations, saves), total=saves, desc="Running simulation"):
-        x_hist[i] = positions
-        v_hist[i] = velocities
-
-    fig = plt.figure(figsize=(10, 10))
-
-    # # Plot a particle trajectory:
-    # ax = fig.add_subplot(projection='3d')
-    # ax.set_title("Particle trajectory [red -> purple]")
-
-    # c = np.linspace(1, 0, iterations)
-    # for i in range(iterations):
-    #     ax.plot(x_hist[i:i+2, 0, 0], x_hist[i:i+2, 0, 1], x_hist[i:i+2, 0, 2], color=cm.rainbow(c[i]))
-
-    # # Plot the spread of particle velocities:
-    # t = np.linspace(0, iterations, saves)
-    # us = np.linalg.norm(v_hist, axis=-1)
-    # plt.errorbar(t, us.mean(axis=-1), us.std(axis=-1), label="velocity spread")
-
-    # plt.legend()
-    # plt.show()

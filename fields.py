@@ -100,12 +100,3 @@ class Fields:
         B_interpolator = RegularGridInterpolator((range_x, range_y, range_z), self._B_wrapped)
 
         return E_interpolator(positions), B_interpolator(positions)
-
-
-if __name__ == "__main__":
-    """ A simple test of the fields class. """
-    edges_cells = np.array([100, 100, 100])
-    fields = Fields.uniform_fields(edges_cells, np.array([1, 0, 0]), np.array([0, 0, 1]))
-    fields.E[0, 0] = [0, 0, 0]
-    Ei, Bi = fields.interpolate([-0.5, 0, 0], wrap=True)
-    print(Ei) # Should be [[0.5, 0, 0]]
