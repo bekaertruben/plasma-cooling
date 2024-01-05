@@ -54,7 +54,13 @@ class Simulation():
     positions: np.ndarray
     velocities: np.ndarray
 
-    def __init__(self, N: int, T: float, parameters: SimulationParameters, fields: Optional[Fields] = None) -> None:
+    def __init__(self, 
+            N: int,
+            T: float,
+            parameters: SimulationParameters,
+            fields: Optional[Fields] = None,
+            skip_particle_generation: bool = False
+    ) -> None:
         self.N = N
         self.T = T
         self.parameters = parameters
@@ -63,7 +69,8 @@ class Simulation():
         else:
             self.fields = Fields.uniform_fields(self.parameters.edges_cells)
 
-        self.generate_particles()
+        if not skip_particle_generation:
+            self.generate_particles()
 
     def generate_particles(self) -> None:
         """ Generate `N` particles with temperature `T` and add them to the simulation. """
@@ -119,5 +126,33 @@ class Simulation():
         with h5py.File(path, 'w') as file:
             file.create_dataset("positions", data=self.positions)
             file.create_dataset("velocities", data=self.velocities)
-            file.create_dataset("fields", data=self.fields)
-            file.create_dataset("parameters", data=self.parameters)
+            file.create_dataset("fields/Bnorm", data=self.fields.Bnorm)
+            file.create_dataset("fields/E", data=self.fields.E)
+            file.create_dataset("fields/B", data=self.fields.B)
+            file.create_dataset("parameters", data=self.parameters.as_array)
+
+    @classmethod
+    def load(cls, path: str):
+        """ Load a simulation from a file. """
+        with h5py.File(path, 'r') as file:
+            positions = file['positions'][()]
+            velocities = file['velocities'][()]
+
+            edges_cells = np.asarray(positions.shape[:-1])
+            Bnorm = file['fields/Bnorm'][()]
+            E = file['fields/E'][()]
+            B = file['fields/B'][()]
+
+            parameters = file['parameters'][()]
+
+        sim = cls(
+            N=positions.shape[0],
+            T=0,
+            parameters=SimulationParameters(*parameters),
+            fields=Fields(edges_cells, E, B, Bnorm),
+            skip_particle_generation=True
+        )
+        sim.positions = positions
+        sim.velocities = velocities
+
+        return sim

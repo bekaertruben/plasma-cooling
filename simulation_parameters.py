@@ -31,7 +31,7 @@ class SimulationParameters:
     q_over_m: float = -1.
     gamma_syn: Optional[float] = 10.
     gamma_ic: Optional[float] = 10.
-    beta_rec: float = 0.1 # TODO: check if this may be independently defined from gamma_syn and gamma_ic
+    beta_rec: float = 0.1
 
     def __post_init__(self):
         if self.cc > 0.5:
@@ -40,3 +40,8 @@ class SimulationParameters:
     @property
     def edges_cells(self):
         return np.array([self.n_cells, self.n_cells, self.n_cells])
+    
+    @property
+    def as_array(self):
+        """ Turns the parameters into a numpy array so that it can be easily used in h5py """
+        return np.array([self.n_cells, self.cc, self.q_over_m, self.gamma_syn, self.gamma_ic, self.beta_rec])
