@@ -4,4 +4,7 @@ mpmath
 h5py
 pandas
 matplotlib
+ipympl
 tqdm
+rich
+joblib
