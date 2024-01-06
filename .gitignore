@@ -4,6 +4,7 @@ sources
 test.ipynb
 *.png
 pickles
+refactored-simresults
 .vscode
 requirements*.lock 
 *.prof
