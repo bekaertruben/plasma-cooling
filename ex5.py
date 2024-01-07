@@ -6,18 +6,12 @@ import utils
 import numpy as np
 
 
-def transferred_power(x, u, E, B):
-    """ See exercise 4 problem statement """
-    E_parallel = utils.project(E, B)
-    E_perpendicular = E - E_parallel
-
-    v = u / utils.lorentz_factor(u)[..., np.newaxis]
-
-    # using q = -1
-    P_parallel = - np.sum(v * E_parallel, axis=-1)
-    P_perpendicular = - np.sum(v * E_perpendicular, axis=-1)
-
-    return P_parallel, P_perpendicular
+def pitch_angle(u: np.ndarray, B: np.ndarray):
+    """ See exercise 5 problem statement """
+    assert u.shape == B.shape, f"Shapes of u and B must match, got {u.shape} and {B.shape}"
+    u_norm = u / np.linalg.norm(u, axis=-1)[..., np.newaxis]
+    B_norm = B / np.linalg.norm(B, axis=-1)[..., np.newaxis]
+    return np.arccos(np.sum(u_norm * B_norm, axis=-1))
 
 
 if __name__ == "__main__":
@@ -25,7 +19,7 @@ if __name__ == "__main__":
     import matplotlib.pyplot as plt
     plt.style.use("ggplot")
 
-    N = 100_000
+    N = 10_000
     iterations = 500
     saves = 100
 
@@ -39,18 +33,15 @@ if __name__ == "__main__":
         )
     )
 
-    p_hist = np.zeros((saves, 2, N))
+    alpha_hist = np.zeros((saves, N))
     for i, positions, velocities in tqdm(sim.run(iterations, saves), total=saves, desc="Running simulation"):
         Ei, Bi = fields.interpolate(positions)
-        p_hist[i] = transferred_power(positions, velocities, Ei, Bi)
-    
-    p_parallel_total = p_hist[:, 0, :].sum(axis=-1)
-    p_perpendicular_total = p_hist[:, 1, :].sum(axis=-1)
+        alpha_hist[i] = pitch_angle(velocities, Bi)
+
 
     fig = plt.figure(figsize=(10, 5))
     t = np.linspace(0, iterations, saves)
-    plt.scatter(t, p_parallel_total / p_perpendicular_total)
-    plt.yscale("log")
+    plt.scatter(t, ...)
     plt.xlabel("Time")
     plt.ylabel("$P_{\\parallel} / P_{\\perp}$")
     plt.show()
