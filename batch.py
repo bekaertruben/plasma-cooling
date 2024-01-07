@@ -1,7 +1,7 @@
 from simulation import Simulation
 from fields import Fields
 from simulation_parameters import SimulationParameters
-from pusher import lorentz_factor
+from utils import lorentz_factor
 
 
 import numpy as np
