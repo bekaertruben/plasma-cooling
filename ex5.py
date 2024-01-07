@@ -17,9 +17,11 @@ def pitch_angle(u: np.ndarray, B: np.ndarray):
 if __name__ == "__main__":
     from tqdm import tqdm
     import matplotlib.pyplot as plt
+    import seaborn as sns
+    import matplotlib.patches as mpatches
     plt.style.use("ggplot")
 
-    N = 10_000
+    N = 100_000
     iterations = 500
     saves = 100
 
@@ -29,19 +31,32 @@ if __name__ == "__main__":
         T=1,
         fields=fields,
         parameters=SimulationParameters(
-            gamma_syn=2.0, gamma_ic=2.0, cc=0.45
+            gamma_syn=3.0, gamma_ic=3.0, cc=0.45
         )
     )
 
+    E_hist = np.zeros((saves, N)) # kinetic energy
     alpha_hist = np.zeros((saves, N))
     for i, positions, velocities in tqdm(sim.run(iterations, saves), total=saves, desc="Running simulation"):
         Ei, Bi = fields.interpolate(positions)
+
+        E_hist[i] = utils.lorentz_factor(velocities) - 1
         alpha_hist[i] = pitch_angle(velocities, Bi)
 
+    logE = np.log10(E_hist)
 
     fig = plt.figure(figsize=(10, 5))
-    t = np.linspace(0, iterations, saves)
-    plt.scatter(t, ...)
-    plt.xlabel("Time")
-    plt.ylabel("$P_{\\parallel} / P_{\\perp}$")
+
+    sns.kdeplot(x=logE[0], y=alpha_hist[0], fill=True, cmap="Blues", alpha=1)
+    sns.kdeplot(x=logE[-1], y=alpha_hist[-1], fill=True, cmap="Reds", alpha=0.5)
+
+    plt.xlabel("$\\log_{10}(E_e)$")
+    plt.ylabel("$\\alpha$")
+
+    plt.xlim(-1.5, 1)
+
+    plt.legend(loc='upper left', handles=[
+        mpatches.Patch(color='blue', alpha=0.5, label='Initial distribution'),
+        mpatches.Patch(color='red', alpha=0.5, label='Steady state distribution')
+    ])
     plt.show()
