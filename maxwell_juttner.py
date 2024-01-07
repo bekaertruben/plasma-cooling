@@ -3,7 +3,6 @@ from mpmath import mp
 from scipy.special import kn, binom, erf
 from scipy.integrate import quad
 from scipy.optimize import minimize_scalar, curve_fit
-from scipy.stats import iqr
 from typing import Optional
 # For some reason, mpmath is the only library with an incomplete gamma accepting negative inputs
 
