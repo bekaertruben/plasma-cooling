@@ -9,17 +9,16 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 plt.style.use("ggplot")
 
-N = 1000
-iterations = 10_000
+N = 10_000
+iterations = 500
 saves = 100
 
 sim = Simulation(
     N=N,
-    T=10,
-    # fields = Fields.uniform_fields(np.array([100, 100, 100]), B0 = np.array([0, 0, 1])),
+    T=0.3,
     fields=Fields.from_file(),
     parameters=SimulationParameters(
-        gamma_syn=None, gamma_ic=10., cc=0.45),
+        gamma_syn=3., gamma_ic=3., cc=0.45),
 )
 
 x_hist = np.zeros((saves, N, 3))
@@ -29,22 +28,18 @@ for i, positions, velocities in tqdm(sim.run(iterations, saves), total=saves, de
     x_hist[i] = positions
     u_hist[i] = velocities
 
-# # Plot a particle trajectory:
-# fig = plt.figure(figsize=(10, 10))
-# ax = fig.add_subplot(projection='3d')
-# ax.set_title("Particle trajectory [red -> purple]")
-
-# c = np.linspace(1, 0, saves)
-# for i in range(saves):
-#     ax.scatter(x_hist[i, 0, 0], x_hist[i, 0, 1], x_hist[i, 0, 2], color=cm.rainbow(c[i]))
-# plt.legend()
-# plt.show()
-
-# Plot the spread of particle velocities:
 fig = plt.figure(figsize=(10, 5))
 t = np.linspace(0, iterations, saves)
-us = np.linalg.norm(u_hist, axis=-1)
-plt.errorbar(t, us.mean(axis=-1), us.std(axis=-1), fmt='o', markersize=3)
-plt.xlabel("Iteration")
-plt.ylabel("Particle velocity spread")
+
+ux_drift = u_hist[..., 0].mean(axis=1)
+uy_drift = u_hist[..., 1].mean(axis=1)
+uz_drift = u_hist[..., 2].mean(axis=1)
+
+plt.plot(t, ux_drift, label="$u_x$")
+plt.plot(t, uy_drift, label="$u_y$")
+plt.plot(t, uz_drift, label="$u_z$")
+
+plt.xlabel("Time")
+plt.ylabel("Drift velocity")
+plt.legend()
 plt.show()
