@@ -7,6 +7,8 @@ import matplotlib.pyplot as plt
 import os
 import re
 
+plt.style.use("ggplot")
+
 prefix = "ex2"
 names = [name for name in os.listdir(prefix) if name[0] == "N"]
 names.sort()
@@ -51,7 +53,7 @@ def exercise2(names: list[str], prefix: str = prefix, lc: int = 5):
     ax.set_ylabel("Counts")
     ax.set_yscale("log")
 
-    fig.legend(handles, labels, loc="upper left", fontsize="small")
+    ax.legend(handles, labels, loc="upper left", fontsize="small")
 
     return fig
 

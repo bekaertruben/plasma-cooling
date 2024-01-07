@@ -9,6 +9,8 @@ import matplotlib.pyplot as plt
 from simulation_parameters import SimulationParameters
 import os
 
+plt.style.use("ggplot")
+
 gd = [3, 30, 300]
 cs = [{"syn": g, "ic": g} for g in gd]
 particles = 1
