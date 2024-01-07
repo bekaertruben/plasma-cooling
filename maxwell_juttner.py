@@ -3,6 +3,7 @@ from mpmath import mp
 from scipy.special import kn, binom, erf
 from scipy.integrate import quad
 from scipy.optimize import minimize_scalar, curve_fit
+from scipy.stats import iqr
 
 # For some reason, mpmath is the only library with an incomplete gamma accepting negative inputs
 
@@ -184,60 +185,15 @@ class MaxwellJuttnerDistribution:
 
     @classmethod
     def fit(cls, data):
-        hist, bin_edges = np.histogram(data, bins="auto", density=True)
+        """ Fit the Maxwell-Juttner distribution to data using curve_fit """
+        hist, bin_edges = np.histogram(data, bins='auto', density=True)
 
-        def f(x, temperature):
-            distr = cls(temperature)
+        def f(x, T):
+            distr = cls(T)
             return distr.pdf(x)
 
         bin_centers = 0.5 * (bin_edges[1:] + bin_edges[:-1])
 
-        return curve_fit(f, bin_centers, hist)
-
-
-def main():
-    T = 0.3
-    N = 10000
-
-    import pandas as pd
-    MJ_gammas = pd.read_csv('data/MJ_gammas.csv', index_col=0)
-    idx = f'T={T}'
-    data = MJ_gammas.loc[idx].sample(N).values
-
-    p, pcov = MaxwellJuttnerDistribution.fit(data)
-
-    t = p[0]
-    tvar = pcov[0, 0]
-    print(f"p: {t}, std: {tvar**(0.5)}")
-
-    import matplotlib.pyplot as plt
-    fig = plt.figure()
-    ax = fig.add_subplot()
-    gspace = np.geomspace(min(data), max(data))
-
-    def mycurve(x, temp, ampl=1):
-        mj = MaxwellJuttnerDistribution(temp)
-        return ampl*mj.pdf(x)
-
-    truecurve = mycurve(gspace, T)
-    fitcurve = mycurve(gspace, t)
-    fitupcurve = mycurve(gspace, t+tvar**(0.5))
-    fitdowncurve = mycurve(gspace, t-tvar**(0.5))
-
-    ax.hist(np.log10(data), bins="auto",
-            histtype="step", color="grey", label="data", density=True)
-    # binw = bins[1]-bins[0]
-    ax.plot(np.log10(gspace), truecurve,
-            color="black", label="truecurve", ls="--", zorder=0)
-    ax.plot(np.log10(gspace), fitcurve, color="red", label='fitcurve')
-    ax.fill_between(np.log10(gspace), fitdowncurve,
-                    fitupcurve, alpha=0.5, color="m", label="curve uncert")
-
-    ax.set_yscale("log")
-
-    fig.legend(fontsize="small")
-    plt.show()
-
-
-if __name__ == '__main__':
-    main()
+        T0 = np.mean(data) - 1 # initial guess for temperature
+        T, cov = curve_fit(f, bin_centers, hist, p0=T0)
+        return T[0], np.sqrt(cov[0, 0])
