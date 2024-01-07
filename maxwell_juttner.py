@@ -4,7 +4,7 @@ from scipy.special import kn, binom, erf
 from scipy.integrate import quad
 from scipy.optimize import minimize_scalar, curve_fit
 from scipy.stats import iqr
-
+from typing import Optional
 # For some reason, mpmath is the only library with an incomplete gamma accepting negative inputs
 
 
@@ -184,9 +184,12 @@ class MaxwellJuttnerDistribution:
         return self.ppf(np.random.random(size=size), method=method)
 
     @classmethod
-    def fit(cls, data):
+    def fit(cls, data, N: Optional[int] = None):
         """ Fit the Maxwell-Juttner distribution to data using curve_fit """
         hist, bin_edges = np.histogram(data, bins='auto', density=True)
+
+        if N is not None:
+            hist *= len(data)/N
 
         def f(x, T):
             distr = cls(T)
@@ -194,6 +197,64 @@ class MaxwellJuttnerDistribution:
 
         bin_centers = 0.5 * (bin_edges[1:] + bin_edges[:-1])
 
-        T0 = np.mean(data) - 1 # initial guess for temperature
+        T0 = np.mean(data) - 1  # initial guess for temperature
         T, cov = curve_fit(f, bin_centers, hist, p0=T0)
         return T[0], np.sqrt(cov[0, 0])
+
+
+def main():
+    T = 10
+    N = 100_000
+
+    import pandas as pd
+    MJ_gammas = pd.read_csv('data/MJ_gammas.csv', index_col=0)
+    idx = f'T={T}'
+    data = MJ_gammas.loc[idx].sample(N).values
+
+    hist, bin_edges = np.histogram(np.log10(data - 1), bins=500)
+    bincenters = 0.5*(bin_edges[1:] + bin_edges[:-1])
+    argpeak = bincenters[np.argmax(hist)]
+
+    t, tstd = MaxwellJuttnerDistribution.fit(
+        data[data < (10**argpeak + 1)], N=N)
+
+    print(f"p: {t}, std: {tstd}")
+
+    import matplotlib.pyplot as plt
+    fig = plt.figure()
+    ax = fig.add_subplot()
+    gspace = np.geomspace(min(data), max(data))
+
+    def mycurve(x, temp, ampl=1):
+        mj = MaxwellJuttnerDistribution(temp)
+        return ampl*mj.pdf(x)
+
+    truecurve = mycurve(gspace, T)
+    fitcurve = mycurve(gspace, t)
+    fitupcurve = mycurve(gspace, t+tstd)
+    fitdowncurve = mycurve(gspace, t-tstd)
+
+    n, edges, patches = ax.hist(np.log10(data - 1), bins="auto",
+                                histtype="step", color="grey", label="data", density=False)
+    binw = edges[1]-edges[0]
+    factor = binw * N
+
+    ax.plot(np.log10(gspace-1), np.log(10) * (gspace-1) * factor * truecurve,
+            color="black", label="truecurve", ls="--", zorder=0)
+    ax.plot(np.log10(gspace-1), np.log(10) * (gspace-1) *
+            factor * fitcurve, color="red", label='fitcurve')
+    ax.fill_between(np.log10(gspace-1), np.log(10) * (gspace-1) * factor * fitdowncurve,
+                    np.log(10) * (gspace-1) * factor * fitupcurve, alpha=0.5, color="m", label="curve uncert")
+
+    ax.set_yscale("log")
+
+    ylims = ax.get_ylim()
+    ax.vlines(argpeak, *ylims)
+    ax.set_ylim(*ylims)
+
+    fig.legend(fontsize="small")
+    plt.show()
+
+
+if __name__ == '__main__':
+    main()
