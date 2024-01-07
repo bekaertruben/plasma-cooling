@@ -7,6 +7,7 @@ from typing import Optional
 from simulation_parameters import SimulationParameters
 from maxwell_juttner import MaxwellJuttnerDistribution
 from fields import Fields
+import utils
 import pusher
 
 
@@ -84,7 +85,7 @@ class Simulation():
                 approximation_order=1 if T > 100 else None
             )
             gammas = mj.sample(self.N)
-        us = np.sqrt(gammas**2 - 1)
+        us = utils.proper_velocity(gammas)
 
         # Sample directions from uniform spherical distribution
         phi = np.random.uniform(0, np.pi*2, size=self.N)

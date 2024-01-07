@@ -3,16 +3,7 @@ from typing import Optional
 
 from fields import Fields
 from simulation_parameters import SimulationParameters
-
-
-def apply_periodicity(x: np.ndarray, edges: np.ndarray):
-    """ Wraps positions to the simulation box defined by edges """
-    return np.mod(x, edges)
-
-
-def lorentz_factor(u: np.ndarray):
-    """ Compute the lorentz factor of particles with velocity u. """
-    return np.sqrt(1 + np.sum(np.square(u), axis=-1))
+import utils
 
 
 def boris_push(
@@ -57,7 +48,7 @@ def boris_push(
     u1prime = cc * u0 + e0
 
     # first half magnetic rotation
-    gamma1 = lorentz_factor(u1prime / cc)[..., np.newaxis]
+    gamma1 = utils.lorentz_factor(u1prime / cc)[..., np.newaxis]
     f = 2. / (1. + np.sum(np.square(b0/(cc * gamma1)), axis=-1)
               )[..., np.newaxis]
     u2prime = (u1prime + np.cross(u1prime/(cc * gamma1), b0, axis=-1))*f
@@ -102,7 +93,7 @@ def radiate_synchrotron(
 
     """
     uci = 0.5 * (u0 + u1)
-    gci = lorentz_factor(uci)[..., np.newaxis]
+    gci = utils.lorentz_factor(uci)[..., np.newaxis]
     betaci = uci / gci
 
     Ebar = Eci + np.cross(betaci, Bci, axis=-1)
@@ -110,14 +101,14 @@ def radiate_synchrotron(
     beta_dot_e = np.einsum("ij,ij->i", betaci, Eci)[..., np.newaxis]
 
     kappa_R = np.cross(Ebar, Bci, axis=-1) + beta_dot_e * Eci
-    chi_R_sq = np.sum(np.square(Ebar), axis=-1)[:, np.newaxis] - beta_dot_e**2
+    chi_R_sq = np.sum(np.square(Ebar), axis=-1)[..., np.newaxis] - beta_dot_e**2
 
     prefactor = Bnorm * sim_params.beta_rec / \
         (sim_params.cc * sim_params.gamma_syn**2)
 
     unext = u0 + prefactor * (kappa_R - chi_R_sq * gci * uci)
 
-    gnext = lorentz_factor(unext)
+    gnext = utils.lorentz_factor(unext)
     return unext
 
 
@@ -151,7 +142,7 @@ def radiate_inversecompton(
 
     """
     uci = 0.5 * (u0 + u1)
-    gci = lorentz_factor(uci)[..., np.newaxis]
+    gci = utils.lorentz_factor(uci)[..., np.newaxis]
 
     dummy = Bnorm * sim_params.beta_rec / \
         (sim_params.cc * sim_params.gamma_ic**2)
@@ -189,7 +180,7 @@ def push(
         particle velocities at step n + 1/2
 
     """
-    g0 = lorentz_factor(u0)[..., np.newaxis]
+    g0 = utils.lorentz_factor(u0)[..., np.newaxis]
     xci = x0 + u0 / (2 * g0)
     u_lorentz, Eci, Bci = boris_push(x0, u0, fields, sim_params)
 
@@ -215,111 +206,7 @@ def push(
     elif ic_drag and syn_drag:
         unext = u_lorentz + u_syn + u_ic - 2 * u0
 
-    gnext = lorentz_factor(unext)[..., np.newaxis]
+    gnext = utils.lorentz_factor(unext)[..., np.newaxis]
     xnext = xci + unext / (2 * gnext)
-    xnext = apply_periodicity(xnext, sim_params.edges_cells)
+    xnext = utils.apply_periodicity(xnext, sim_params.edges_cells)
     return xnext, unext
-
-
-def transferred_power(
-        velocity: np.ndarray,
-        Eci: Optional[np.ndarray] = None,
-        Bci: Optional[np.ndarray] = None,
-        fields: Optional[dict] = None,
-        position: Optional[np.ndarray] = None
-):
-    """
-    Get the parallel and perpendicular power transferred from field to particle.
-
-    Arguments
-    ---------
-    charge: float or list[float]
-        particle charge in Coulomb
-
-    velocity: np.ndarray (shape: (..., 3))
-        particle velocities at step n + 1/2
-
-    Eci: Optional[np.ndarray] (shape: (..., 3)) (default: None)
-        interpolated electric field at steps n. If None, fields and position must be passed.
-
-    Bci: Optional[np.ndarray] (shape: (..., 3)) (default: None)
-        interpolated magnetic field at steps n. If None, fields and position must be passed.
-
-    fields: Optional[dict] (default: None)
-        keys must include 'ex','ey','ez','bx','by','bz'. The values are 3D arrays of shape (N_CELLS, N_CELLS, N_CELLS).
-        If None, Eci and Bci must be passed.
-
-    position: Optional[np.ndarray] (shape: (..., 3)) (default: None)
-        particle positions at steps n. If None, Eci and Bci must be passed.
-
-    Returns
-    -------
-    Ppar / Pperp: np.ndarray (shape: (...))
-        ratio parallel over perpendicular power
-
-    """
-    if (Eci is None or Bci is None) and (fields is None or position is None):
-        raise ValueError(
-            "Eci and Bci have to be passed, or fields and position. No consistent arguments are given.")
-
-    if Eci is None or Bci is None:
-        fields_ci = {key: interpolate_field(
-            position, value) for key, value in fields.items()}
-        Eci = np.array([fields_ci[key] for key in ["ex", "ey", "ez"]])
-        Bci = np.array([fields_ci[key] for key in ["bx", "by", "bz"]])
-        if len(position.shape) >= 2:
-            Eci = np.swapaxes(Eci, 0, 1)
-            Bci = np.swapaxes(Bci, 0, 1)
-
-    # Epar = np.diag(Eci.T @ Bci) * Bci / \
-    #     np.linalg.norm(Bci, axis=len(Bci.shape)-1) ** 2
-    normalization = np.linalg.norm(Bci, axis=-2) ** 2
-    Epar = np.einsum("...ij,...ij,...ik->...ik", Eci, Bci, Bci)
-    Epar /= normalization[:, np.newaxis, :]
-    Eperp = Eci - Epar
-
-    Ppar = np.einsum("...ij,...ij -> ...i", velocity, Epar)
-    Pperp = np.einsum("...ij,...ij -> ...i", velocity, Eperp)
-
-    return Ppar / Pperp
-
-
-def pitch_angle(
-        u: np.ndarray,
-        Bci: Optional[np.ndarray] = None,
-        fields: Optional[dict] = None,
-        position: Optional[np.ndarray] = None
-):
-    """
-    Get the pitch angle of the particle.
-
-    Arguments
-    ---------
-    u: np.ndarray (shape: (...,3))
-        particle velocities at step n + 1/2
-
-    Bci: Optional[np.ndarray] (shape: (...,3)) (default: None)
-        interpolated magnetic field at step n. If None, fields and position must be passed.
-
-    fields: Optional[dict] (default: None)
-        keys must include 'ex','ey','ez','bx','by','bz'. The values are 3D arrays of shape (N_CELLS, N_CELLS, N_CELLS). If None, Bci must be passed.
-
-    position: Optional[np.ndarray] (shape: (...,3)) (default: None)
-        particle positions at step n. If None, Bci must be passed.
-
-    Returns
-    -------
-    pitch_angle: np.ndarray (shape: (...,3))
-        pitch angle of the particle
-
-    """
-    if (Bci is None) and (fields is None or position is None):
-        raise ValueError(
-            "Bci has to be passed, or fields and position. No consistent arguments are given.")
-
-    if Bci is None:
-        fields_ci = {key: interpolate_field(position, fields[key])
-                     for key in ["bx", "by", "bz"]}
-        Bci = np.array([fields_ci[key] for key in ["bx", "by", "bz"]])
-
-    return np.arccos(np.einsum("...ij, ...ij -> ...i", u, Bci) / (np.linalg.norm(u, axis=-1) * np.linalg.norm(Bci, axis=-1)))
