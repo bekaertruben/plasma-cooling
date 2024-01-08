@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import os
 import re
 
+plt.rcdefaults()
 plt.style.use("ggplot")
 
 prefix = "ex2"
@@ -30,7 +31,7 @@ def axhist_energy_spectrum(ax: axes.Axes, U: np.ndarray, color: str, *args, **kw
 
 
 def exercise2(names: list[str], prefix: str = prefix, lc: int = 5):
-    fig = plt.figure(figsize=(6, 4))
+    fig = plt.figure(figsize=(6, 4), dpi=300)
     ax = fig.add_subplot()
 
     handles = []
@@ -45,13 +46,16 @@ def exercise2(names: list[str], prefix: str = prefix, lc: int = 5):
         ax = axhist_energy_spectrum(ax, u_hist, color)
         # ax = axhist_energy_spectrum(ax, u_hist[::(len(u_hist) // lc)], color)
         handles.append(patches.Rectangle(
-            (0, 0), 1, 1, ec=color, color="white"))
+            (0, 0), 1, 1, ec=color, fill=False))
         labels.append(
             fr"$\gamma_\mathrm{{syn}} = {syn}, \gamma_\mathrm{{IC}} = {ic}$")
 
     ax.set_xlabel(r"$\log_{10}\left(\gamma - 1\right)$")
-    ax.set_ylabel("Counts")
+    ax.set_ylabel(
+        r"$N\left(\,E_\mathrm{kin}\, / \,m_e c^2 = \gamma - 1\right)$")
     ax.set_yscale("log")
+
+    ax.set_xlim(left=-3.4)
 
     ax.legend(handles, labels, loc="upper left", fontsize="small")
 
@@ -59,11 +63,14 @@ def exercise2(names: list[str], prefix: str = prefix, lc: int = 5):
 
 
 def main():
-    figs = []
+    # figs = []
     figcount = int(np.sqrt(len(names)))
     for i in range(figcount):
-        figs.append(exercise2(names[figcount*i: figcount*(i+1)], lc=10))
-        plt.show()
+        fig = exercise2(names[figcount*i: figcount*(i+1)], lc=10)
+        fig.subplots_adjust(bottom=0.2)
+        fig.savefig(f"ex2/images/ex2-{i+1}.png", facecolor="white")
+        # plt.show()
+        # break
 
 
 if __name__ == '__main__':
