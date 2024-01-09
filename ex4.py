@@ -48,7 +48,7 @@ if __name__ == "__main__":
     ax.set_xlabel("$x$")
     ax.set_ylabel("$y$")
     ax.set_zlabel("$z$")
-    plt.show()
+    # plt.show()
 
 
     # a) plot the ratio of parallel to perpendicular power
@@ -94,7 +94,7 @@ if __name__ == "__main__":
     # plt.xlim(5, 1000)
     # plt.ylim(1e-7, 1e3)
 
-    plt.title(f"Ratio of parallel to perpendicular power ($\\gamma_\\text{{syn}} = {gamma_syn}$, $\\gamma_\\text{{IC}} = {gamma_ic}$)")
+    plt.title(f"Ratio of parallel to perpendicular power ({plot_identifier})")
     plt.xlabel("$E_e$ [$m_e c^2$]")
     plt.ylabel("$| P_{\\parallel} / P_{\\perp} |$")
     plt.xscale("log")
@@ -104,14 +104,14 @@ if __name__ == "__main__":
         Patch(color='red', alpha=0.5, label='Negative'),
         Line2D([], [], linestyle=":", color='black', label='Average')
     ])
-    plt.show()
+    # plt.show()
 
     # b) plot the integrated power over time
     Ei, Bi = Fields.from_file().interpolate(x_hist)
     Ppar, Pperp = transferred_power(x_hist, u_hist, Ei, Bi)
 
-    Ppar_int = np.cumsum(Ppar, axis=0)
-    Pperp_int = np.cumsum(Pperp, axis=0)
+    Ppar_int = 6000/100 * np.cumsum(Ppar, axis=0)
+    Pperp_int = 6000/100 * np.cumsum(Pperp, axis=0)
 
     fig = plt.figure(figsize=(10, 5))
 
@@ -121,6 +121,7 @@ if __name__ == "__main__":
 
     plt.yscale("log")
 
+    plt.title(f"Integrated power ({plot_identifier})")
     plt.xlabel("Time")
     plt.ylabel("Integrated power")
     plt.legend()
