@@ -2,7 +2,7 @@ from simulation import Simulation
 from fields import Fields
 from utils import lorentz_factor
 import numpy as np
-from matplotlib import axes, patches, lines
+from matplotlib import axes, patches, lines, colors
 import matplotlib.pyplot as plt
 from typing import Optional
 from warnings import warn
@@ -13,7 +13,8 @@ import os
 plt.rcdefaults()
 plt.style.use("ggplot")
 
-gd = [3, 30, 300]
+gd = [3, 20, 100]
+# gd = [3, 30, 300]
 cs = [{"syn": g, "ic": g} for g in gd]
 particles = 1
 temp = 0.3
@@ -52,16 +53,17 @@ def simulate_pic():
 def axplot_trajectory(ax: axes.Axes, X: np.ndarray, time: Optional[np.ndarray] = None, *args, **kwargs):
     if time is None:
         time = np.arange(X.shape[0])
-    colors = ["k", "c", "m"]
+    colorvals = [c for c in colors.TABLEAU_COLORS.values()][:3]
     lines = []
     for i in range(3):
         lines.append(ax.plot(time, X[:, 0, i],
-                     color=colors[i], *args, **kwargs))
+                     color=colorvals[i], *args, **kwargs))
     ax.set_xlabel("Iteration")
     return ax, lines
 
 
 def exercise1(names: list[str], cooling_strenghts: list[dict] = cs, maxit: int = 100):
+    colorvals = [c for c in colors.TABLEAU_COLORS.values()][:3]
     if len(names) > 4:
         warn("len(names) > 4, all items after the 4th will not be considered")
         names = names[:4]
@@ -74,24 +76,24 @@ def exercise1(names: list[str], cooling_strenghts: list[dict] = cs, maxit: int =
     for name, style in zip(names, linestyles):
         x_hist = np.load(f"{prefix}/{name}/x_hist.npy")[:maxit]
         u_hist = np.load(f"{prefix}/{name}/u_hist.npy")[:maxit]
-        print(f"gamma {name} : {lorentz_factor(u_hist[:,0])}")
+        # print(f"gamma {name} : {lorentz_factor(u_hist[:,0])}")
         ax1, _ = axplot_trajectory(ax1, x_hist, lw=0.8, ls=style)
         ax2, _ = axplot_trajectory(ax2, u_hist, lw=0.8, ls=style)
 
-    ax1.set_ylim(0, 160)
+    ax1.set_ylim(0, 4*160)
     ax2.set_xlim(0, maxit)
 
-    kpatch = patches.Patch(color="k", label=r"$\cdot \hat{x}$")
-    cpatch = patches.Patch(color="c", label=r"$\cdot \hat{y}$")
-    mpatch = patches.Patch(color="m", label=r"$\cdot \hat{z}$")
+    kpatch = patches.Patch(color=colorvals[0], label=r"$x_i = x$")
+    cpatch = patches.Patch(color=colorvals[1], label=r"$x_i = y$")
+    mpatch = patches.Patch(color=colorvals[2], label=r"$x_i = z$")
     legendlines = [lines.Line2D([], [], color="grey", linestyle=style, label=f"$\gamma_\mathrm{{IC}} = {drag['ic']}, \gamma_\mathrm{{syn}} = {drag['syn']}$")
                    for style, drag in zip(linestyles, cooling_strenghts)]
 
     fig.legend(handles=[kpatch, cpatch, mpatch] +
                legendlines, fontsize="small")
 
-    ax1.set_ylabel("Position")
-    ax2.set_ylabel("Proper Velocity")
+    ax1.set_ylabel("$x_i$ [$\Delta x$]")
+    ax2.set_ylabel(r"$u_i$ [$\Delta x / \text{iteration}$]")
 
     return fig
 

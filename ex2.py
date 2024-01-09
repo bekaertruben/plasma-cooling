@@ -11,7 +11,7 @@ plt.rcdefaults()
 plt.style.use("ggplot")
 
 prefix = "ex2"
-names = [name for name in os.listdir(prefix) if name[0] == "N"]
+names = [name for name in os.listdir(prefix) if name[0] == "M"]
 names.sort()
 
 
@@ -31,20 +31,21 @@ def axhist_energy_spectrum(ax: axes.Axes, U: np.ndarray, color: str, *args, **kw
 
 
 def exercise2(names: list[str], prefix: str = prefix, lc: int = 5):
-    fig = plt.figure(figsize=(6, 4), dpi=300)
+    fig = plt.figure(figsize=(5, 4), dpi=200)
     ax = fig.add_subplot()
 
     handles = []
     labels = []
-    pattern = r"N(.+)-S(.+)-T(.+)-alph(.+)-syn(.+)-ic(.+)"
+    pattern = r"M(.+)-S(.+)-T(.+)-syn(.+)-ic(.+)"
+    # pattern = r"N(.+)-S(.+)-T(.+)-alph(.+)-syn(.+)-ic(.+)"
 
     for name, color in zip(names, colors.TABLEAU_COLORS.values()):
         match = re.search(pattern, name)
-        N, S, T, alph, syn, ic = (match.group(i+1) for i in range(6))
+        N, S, T, syn, ic = (match.group(i+1) for i in range(5))
 
         u_hist = np.load(f"{prefix}/{name}/u_hist.npy")
-        ax = axhist_energy_spectrum(ax, u_hist, color)
-        # ax = axhist_energy_spectrum(ax, u_hist[::(len(u_hist) // lc)], color)
+        # ax = axhist_energy_spectrum(ax, u_hist, color)
+        ax = axhist_energy_spectrum(ax, u_hist[::(len(u_hist) // lc)], color)
         handles.append(patches.Rectangle(
             (0, 0), 1, 1, ec=color, fill=False))
         labels.append(
@@ -66,10 +67,10 @@ def main():
     # figs = []
     figcount = int(np.sqrt(len(names)))
     for i in range(figcount):
-        fig = exercise2(names[figcount*i: figcount*(i+1)], lc=10)
-        fig.subplots_adjust(bottom=0.2)
-        fig.savefig(f"ex2/images/ex2-{i+1}.png", facecolor="white")
-        # plt.show()
+        fig = exercise2(names[figcount*i: figcount*(i+1)], lc=15)
+        fig.subplots_adjust(bottom=0.15, left=0.15)
+        # fig.savefig(f"ex2/images/ex2-{i+1}.png", facecolor="white")
+        plt.show()
         # break
 
 
