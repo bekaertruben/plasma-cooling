@@ -25,6 +25,8 @@ class Simulation():
     ----------
     N : int
         Number of particles.
+    T: float
+        Inital temperature of the particles.
     parameters : SimulationParameters
         Simulation parameters.
     fields : dict
@@ -47,6 +49,7 @@ class Simulation():
     """
 
     N: int
+    T: float
     parameters: SimulationParameters
     fields: Fields
     positions: np.ndarray
@@ -60,6 +63,7 @@ class Simulation():
             skip_particle_generation: bool = False
     ) -> None:
         self.N = N
+        self.T = T
         self.parameters = parameters
         if fields:
             self.fields = fields
@@ -67,29 +71,29 @@ class Simulation():
             self.fields = Fields.uniform_fields(self.parameters.edges_cells)
 
         if not skip_particle_generation:
-            self.generate_particles(T)
+            self.positions, self.velocities = self.generate_particles(N)
 
-    def generate_particles(self, T) -> None:
+    def generate_particles(self, N) -> None:
         """ Generate `N` particles with temperature `T` and add them to the simulation. """
         # Sample particle positions uniformly over the simulation space
-        self.positions = np.random.rand(self.N, 3) * self.parameters.edges_cells[np.newaxis, :]
+        positions = np.random.rand(N, 3) * self.parameters.edges_cells[np.newaxis, :]
 
         # Sample Lorentz factors from a thermal Maxwell-Jüttner distribution
-        idx = f'T={T}'
-        if idx in MJ_gammas.index and self.N <= MJ_gammas.loc[idx].size:
-            gammas = MJ_gammas.loc[idx].sample(self.N).values
+        idx = f'T={self.T}'
+        if idx in MJ_gammas.index and N <= MJ_gammas.loc[idx].size:
+            gammas = MJ_gammas.loc[idx].sample(N).values
         else:
             mj = MaxwellJuttnerDistribution(
-                T=T,
+                T=self.T,
                 # Approximation only works for large temperatures:
-                approximation_order=1 if T > 100 else None
+                approximation_order=1 if self.T > 100 else None
             )
-            gammas = mj.sample(self.N)
+            gammas = mj.sample(N)
         us = utils.proper_velocity(gammas)
 
         # Sample directions from uniform spherical distribution
-        phi = np.random.uniform(0, np.pi*2, size=self.N)
-        costheta = np.random.uniform(-1, 1, size=self.N)
+        phi = np.random.uniform(0, np.pi*2, size=N)
+        costheta = np.random.uniform(-1, 1, size=N)
         theta = np.arccos(costheta)
         directions = np.array([
             np.sin(theta) * np.cos(phi),
@@ -97,7 +101,18 @@ class Simulation():
             np.cos(theta)
         ]).T
 
-        self.velocities = us[:, np.newaxis] * directions
+        velocities = us[:, np.newaxis] * directions
+        return positions, velocities
+    
+    def particle_escape(self):
+        """ Remove some particles based on the their lifetime,
+        and replace them with particles with particles sampled from the initial temperature distribution.
+        """
+        tau = self.parameters.particle_lifetime * self.parameters.n_cells / self.parameters.cc
+        p_survival = np.exp(- 1 / tau)
+        mask = np.random.rand(self.N) > p_survival
+        if mask.sum() > 0:
+            self.positions[mask], self.velocities[mask] = self.generate_particles(mask.sum())
 
     def step(self) -> None:
         """ Perform one iteration of the simulation. """
@@ -107,6 +122,8 @@ class Simulation():
             self.fields,
             self.parameters
         )
+        if self.parameters.particle_lifetime is not None:
+            self.particle_escape()
 
     def run(self, steps: int, num_snapshots: Optional[int] = None):
         """ Generator running the simulation for `steps` iterations and yielding the positions and velocities every iteration.

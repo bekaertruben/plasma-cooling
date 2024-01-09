@@ -4,7 +4,7 @@ from typing import Optional
 from warnings import warn
 
 
-@dataclass
+@dataclass(frozen=True)
 class SimulationParameters:
     """ Contains all the information about the simulation parameters.
 
@@ -24,6 +24,8 @@ class SimulationParameters:
         Inverse compton drag coefficient. If set to None, no inverse compton drag is applied.
     beta_rec : float
         Fiducial magnetic energy extraction rate.
+    particle_lifetime : Optional[float]
+        Particle lifetime in light box crossing time. If set to None, particles have infinite lifetime.
     """
 
     n_cells: int = 4*160
@@ -32,6 +34,7 @@ class SimulationParameters:
     gamma_syn: Optional[float] = 10.
     gamma_ic: Optional[float] = 10.
     beta_rec: float = 0.1
+    particle_lifetime: Optional[float] = None
 
     def __post_init__(self):
         if self.cc > 0.5:

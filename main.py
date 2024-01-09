@@ -10,7 +10,7 @@ import matplotlib.cm as cm
 plt.style.use("ggplot")
 
 N = 10_000
-iterations = 500
+iterations = 1000
 saves = 100
 
 sim = Simulation(
@@ -18,7 +18,11 @@ sim = Simulation(
     T=0.3,
     fields=Fields.from_file(),
     parameters=SimulationParameters(
-        gamma_syn=3., gamma_ic=3., cc=0.45),
+        gamma_syn=3.,
+        gamma_ic=3.,
+        cc=0.45,
+        particle_lifetime=5,
+    ),
 )
 
 x_hist = np.zeros((saves, N, 3))
