@@ -185,7 +185,7 @@ class MaxwellJuttnerDistribution:
     @classmethod
     def fit(cls, data, N: Optional[int] = None):
         """ Fit the Maxwell-Juttner distribution to data using curve_fit """
-        hist, bin_edges = np.histogram(data, bins='auto', density=True)
+        hist, bin_edges = np.histogram(data, bins='fd', density=True)
 
         if N is not None:
             hist *= len(data)/N
@@ -233,7 +233,7 @@ def main():
     fitupcurve = mycurve(gspace, t+tstd)
     fitdowncurve = mycurve(gspace, t-tstd)
 
-    n, edges, patches = ax.hist(np.log10(data - 1), bins="auto",
+    n, edges, patches = ax.hist(np.log10(data - 1), bins="fd",
                                 histtype="step", color="grey", label="data", density=False)
     binw = edges[1]-edges[0]
     factor = binw * N
