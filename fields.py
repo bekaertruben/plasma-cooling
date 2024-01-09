@@ -14,6 +14,8 @@ class Fields:
         The electric and magnetic fields. The shape is (*edges_cells, 3).
     Bnorm : float
         The average magnetic field strength, by which all fields are normalized.
+    downsampling : int
+        The downsampling factor of the fields.
     """
 
     def __init__(self,
@@ -21,6 +23,7 @@ class Fields:
                  E: np.ndarray,
                  B: np.ndarray,
                  Bnorm: float,
+                 downsampling: int = 1
                  ) -> None:
         self.edges_cells = edges_cells
         self.E = E
@@ -66,7 +69,7 @@ class Fields:
         E = np.moveaxis([ex, ey, ez], 0, -1) / Bnorm
         B = np.moveaxis([bx, by, bz], 0, -1) / Bnorm
 
-        return cls(ex.shape, E, B, Bnorm)
+        return cls(ex.shape, E, B, Bnorm, downsampling=4)
 
     def interpolate(self, positions: np.ndarray, wrap=True) -> np.ndarray:
         """ Interpolates the fields at the given positions.
@@ -83,7 +86,7 @@ class Fields:
         E_interp, B_interp : numpy.ndarray
             Interpolated electric and magnetic fields (..., 3).
         """
-        positions = np.asarray(positions)
+        positions = np.asarray(positions) / self.downsampling
         if positions.shape == (3,):
             positions = positions[np.newaxis, :]
         assert positions.shape[-1] == 3, "Positions must be a (..., 3) array"

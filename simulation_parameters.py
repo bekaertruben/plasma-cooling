@@ -26,7 +26,7 @@ class SimulationParameters:
         Fiducial magnetic energy extraction rate.
     """
 
-    n_cells: int = 160
+    n_cells: int = 4*160
     cc: float = 0.45
     q_over_m: float = -1.
     gamma_syn: Optional[float] = 10.
