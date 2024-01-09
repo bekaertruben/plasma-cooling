@@ -29,6 +29,7 @@ class Fields:
         self.E = E
         self.B = B
         self.Bnorm = Bnorm
+        self.downsampling = downsampling
 
         # The wrapped fields are needed for interpolation
         self._E_wrapped = np.pad(
