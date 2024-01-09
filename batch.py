@@ -9,6 +9,7 @@ from scipy.stats import kstest
 from tqdm import tqdm, trange
 from joblib import Parallel, delayed
 import os
+from typing import Optional
 
 import matplotlib.pyplot as plt
 plt.style.use("ggplot")
@@ -18,11 +19,10 @@ def run(gamma_syn: float,
         gamma_ic: float,
         N: int = 100_000,
         temperature: float = 0.3,
-        saves=10,
-        iterations: int = 1000,
-        alpha: float = 0.05,
+        saves=100,
+        iterations: int = 6000,
         name: str = "test",
-        prefix: str = "refactored-simresults"
+        prefix: Optional[str] = None
         ):
     np.random.seed()
 
@@ -35,27 +35,14 @@ def run(gamma_syn: float,
         )
     )
 
-    x_hist = np.zeros((0, N, 3))
-    u_hist = np.zeros((0, N, 3))
+    x_hist = np.zeros((saves, N, 3))
+    u_hist = np.zeros((saves, N, 3))
 
-    pvals = []
+    # pvals = []
 
-    while len(pvals) == 0 or pvals[-1] < (1 - alpha):
-        x_hist = np.pad(x_hist, [(0, saves), (0, 0),
-                        (0, 0)], constant_values=(0,))
-        u_hist = np.pad(u_hist, [(0, saves), (0, 0),
-                        (0, 0)], constant_values=(0,))
-        for i, positions, velocities in sim.run(iterations, saves):
-            x_hist[i[0] + saves * len(pvals)] = positions
-            u_hist[i[0] + saves * len(pvals)] = velocities
-
-        pvals.append(kstest(lorentz_factor(
-            u_hist[-1]), lorentz_factor(u_hist[-2])).pvalue)
-
-        print(f"{name} pvals:\t{pvals}")
-
-        if len(pvals) >= 10:
-            break
+    for i, positions, velocities in sim.run(iterations, saves):
+        x_hist[i] = positions
+        u_hist[i] = velocities
 
     if not os.path.exists(f"{prefix}/{name}"):
         os.mkdir(f"{prefix}/{name}")
@@ -64,19 +51,18 @@ def run(gamma_syn: float,
 
 
 def main():
-    gfactors = [3, 30, 300]
+    gfactors = [3, 20, 100]
 
     gammas = [(g1, g2) for g1 in gfactors for g2 in gfactors]
 
     nstr = "1e5"
-    saves = 3
+    saves = 100
     temp = 0.3
-    alpha = 0.05
-    name = f"N{nstr}-S{saves}-T{temp}-alph{alpha}"
+    name = f"M{nstr}-S{saves}-T{temp}"
 
     N = int(float(nstr))
     Parallel(n_jobs=min(os.cpu_count()-2, len(gammas)))(delayed(run)(
-        gamma_syn=g[0], gamma_ic=g[1], N=N, iterations=600, temperature=temp, alpha=alpha, saves=saves, name=name+f"-syn{g[0]}-ic{g[1]}") for g in gammas)
+        gamma_syn=g[0], gamma_ic=g[1], N=N, temperature=temp, saves=saves, name=name+f"-syn{g[0]}-ic{g[1]}") for g in gammas)
 
 
 if __name__ == '__main__':
