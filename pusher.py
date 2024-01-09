@@ -107,8 +107,6 @@ def radiate_synchrotron(
         (sim_params.cc * sim_params.gamma_syn**2)
 
     unext = u0 + prefactor * (kappa_R - chi_R_sq * gci * uci)
-
-    gnext = utils.lorentz_factor(unext)
     return unext
 
 
