@@ -17,6 +17,7 @@ plt.style.use("ggplot")
 
 def run(gamma_syn: float,
         gamma_ic: float,
+        lifetime: float = None,
         N: int = 100_000,
         temperature: float = 0.3,
         saves=100,
@@ -26,20 +27,19 @@ def run(gamma_syn: float,
         ):
     np.random.seed()
 
+    fields = Fields.from_file()
+
     sim = Simulation(
         N=N,
         T=temperature,
-        fields=Fields.from_file(),
+        fields=fields,
         parameters=SimulationParameters(
-            gamma_syn=gamma_syn, gamma_ic=gamma_ic, cc=0.45
+            gamma_syn=gamma_syn, gamma_ic=gamma_ic, particle_lifetime=lifetime, cc=0.45, n_cells=fields.downsampling*fields.edges_cells[0]
         )
     )
 
     x_hist = np.zeros((saves, N, 3))
     u_hist = np.zeros((saves, N, 3))
-
-    # pvals = []
-
     for i, positions, velocities in sim.run(iterations, saves):
         x_hist[i] = positions
         u_hist[i] = velocities
@@ -51,15 +51,14 @@ def run(gamma_syn: float,
 
 
 def main():
-    from tqdm import tqdm
-    gfactors = [3, 20, 100]
+    gfactors = [3, 20, 100, None]
 
     gammas = [(g1, g2) for g1 in gfactors for g2 in gfactors]
+    gammas = [_ for _ in gammas if _[0] is None or _[1] is None]
 
     nstr = "1e5"
     saves = 100
     temp = 0.3
-    name = f"M{nstr}-S{saves}-T{temp}"
 
     N = int(float(nstr))
     N_THREADS = min(os.cpu_count()-2, len(gammas))
@@ -67,11 +66,28 @@ def main():
         delayed(run)(
             gamma_syn=g[0],
             gamma_ic=g[1],
+            lifetime=None,
             N=N,
             temperature=temp,
             saves=saves,
-            name=name+f"-syn{g[0]}-ic{g[1]}"
-        ) for g in tqdm(gammas) # progress bar will be instantly full if N_THREADS > len(gammas)
+            prefix="simulations",
+            name=f"M{nstr}-S{saves}-T{temp}-syn{g[0]}-ic{g[1]}",
+        ) for g in tqdm(gammas) # progress bar will be instantly full if N_THREADS >= len(gammas)
+    )
+
+    lifetimes = [1, 5]
+
+    Parallel(n_jobs=N_THREADS)(
+        delayed(run)(
+            gamma_syn=None,
+            gamma_ic=None,
+            lifetime=tau,
+            N=N,
+            temperature=temp,
+            saves=saves,
+            prefix="simulations",
+            name=f"M{nstr}-S{saves}-T{temp}-tau{tau}",
+        ) for tau in tqdm(lifetimes) # progress bar will be instantly full if N_THREADS >= len(gammas)
     )
 
 if __name__ == '__main__':

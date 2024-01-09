@@ -9,6 +9,7 @@ ex2/
 .vscode
 requirements*.lock 
 *.prof
+simulations
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
