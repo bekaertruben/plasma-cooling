@@ -11,7 +11,7 @@ from simulation_parameters import SimulationParameters
 import os
 
 plt.rcdefaults()
-plt.style.use("ggplot")
+# plt.style.use("classic")
 
 gd = [3, 20, 100]
 # gd = [3, 30, 300]
@@ -98,6 +98,31 @@ def exercise1(names: list[str], cooling_strenghts: list[dict] = cs, maxit: int =
     return fig
 
 
+def potential_wells(x: np.ndarray, u: np.ndarray):
+    fig = plt.figure(figsize=(7, 5), dpi=300)
+    ax = fig.add_subplot(projection="3d")
+
+    logE = np.log10(lorentz_factor(u))
+    cm = plt.get_cmap("jet")
+    map = ax.scatter(*x.T, s=0.05, c=logE, cmap=cm)
+    plt.colorbar(mappable=map, shrink=0.5,
+                 label="$\log_{10}(\gamma)$", location="left", pad=0.03)
+    ax.set_xlim(0, 4*160)
+    ax.set_ylim(0, 4*160)
+    ax.set_zlim(0, 4*160)
+
+    ax.set_xlabel("x [cells]")
+    ax.set_ylabel("y [cells]")
+    ax.set_zlabel("z [cells]")
+    ax.set_title(
+        r"$\gamma_\mathrm{syn} = \infty, \gamma_\mathrm{IC} = 3$", loc="left")
+
+    # fig.subplots_adjust(left=0.15, bottom=0.15, right=0.7)
+    print("ring ring")
+    fig.savefig("ex1/hotspots.png")
+    # plt.show()
+
+
 def main():
     names = simulate_pic()
     f1 = exercise1(names)
@@ -106,5 +131,13 @@ def main():
     # f1.savefig(f"{prefix}/images/ex1-trajecetories.png", facecolor="white")
 
 
+def main2():
+    xpath = "ex2/M1e5-S100-T0.3-synNone-ic3/x_hist.npy"
+    upath = "ex2/M1e5-S100-T0.3-synNone-ic3/u_hist.npy"
+    x = np.load(xpath)[-1]
+    u = np.load(upath)[-1]
+    potential_wells(x, u)
+
+
 if __name__ == '__main__':
-    main()
+    main2()
