@@ -51,6 +51,7 @@ def run(gamma_syn: float,
 
 
 def main():
+    from tqdm import tqdm
     gfactors = [3, 20, 100]
 
     gammas = [(g1, g2) for g1 in gfactors for g2 in gfactors]
@@ -61,9 +62,17 @@ def main():
     name = f"M{nstr}-S{saves}-T{temp}"
 
     N = int(float(nstr))
-    Parallel(n_jobs=min(os.cpu_count()-2, len(gammas)))(delayed(run)(
-        gamma_syn=g[0], gamma_ic=g[1], N=N, temperature=temp, saves=saves, name=name+f"-syn{g[0]}-ic{g[1]}") for g in gammas)
-
+    N_THREADS = min(os.cpu_count()-2, len(gammas))
+    Parallel(n_jobs=N_THREADS)(
+        delayed(run)(
+            gamma_syn=g[0],
+            gamma_ic=g[1],
+            N=N,
+            temperature=temp,
+            saves=saves,
+            name=name+f"-syn{g[0]}-ic{g[1]}"
+        ) for g in tqdm(gammas) # progress bar will be instantly full if N_THREADS > len(gammas)
+    )
 
 if __name__ == '__main__':
     main()
