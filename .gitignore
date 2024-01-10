@@ -6,6 +6,7 @@ test.ipynb
 pickles
 ex1/
 ex2/
+ex6/
 .vscode
 requirements*.lock 
 *.prof
