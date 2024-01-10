@@ -27,8 +27,8 @@ if __name__ == "__main__":
     from matplotlib.lines import Line2D
     plt.style.use("ggplot")
 
-    gamma_syn = 3
-    gamma_ic = None
+    gamma_syn = None
+    gamma_ic = 3
     plot_identifier = f"$\\gamma_\\text{{syn}} = {gamma_syn}$, $\\gamma_\\text{{IC}} = {gamma_ic}$"
 
     # load simulation data
@@ -58,9 +58,13 @@ if __name__ == "__main__":
     Ppar, Pperp = transferred_power(x_hist[timestep], u_hist[timestep], Ei, Bi)
     Pratio = Ppar / Pperp
 
+    ratio_order_mean = np.log10(np.abs(Pratio)).mean()
+    ratio_order_spread = np.log10(np.abs(Pratio)).std()
+    print(f"Mean order of magnitude of ratio: {ratio_order_mean} \\pm {ratio_order_spread}")
+
     print(f"Minimum energy (log): {np.log10(Ee.min())}, Maximum energy (log): {np.log10(Ee.max())}")
     bins_edges = np.logspace(np.log10(Ee.min()), np.log10(Ee.max()), 20)
-    # bins_edges = np.logspace(np.log10(2e1), np.log10(2e2), 20) 
+    # bins_edges = np.logspace(np.log10(0.6), np.log10(8), 20) 
     bins = np.moveaxis(np.array([bins_edges[:-1], bins_edges[1:]]), 0, -1)
     bin_centers = 0.5 * (bins[:, 1] + bins[:, 0])
     averages = np.zeros(len(bins))
@@ -84,6 +88,7 @@ if __name__ == "__main__":
         cov=True
     )
     print(f"Slope of average: {slope} \\pm {np.sqrt(cov[0,0])}")
+    print(f"Intercept of average: {intercept} \\pm {np.sqrt(cov[1,1])}")
 
     fig = plt.figure(figsize=(10, 5))
 
@@ -104,7 +109,7 @@ if __name__ == "__main__":
         Patch(color='red', alpha=0.5, label='Negative'),
         Line2D([], [], linestyle=":", color='black', label='Average')
     ])
-    # plt.show()
+    plt.show()
 
     # b) plot the integrated power over time
     Ei, Bi = Fields.from_file().interpolate(x_hist)
@@ -114,15 +119,24 @@ if __name__ == "__main__":
     Pperp_int = 6000/100 * np.cumsum(Pperp, axis=0)
 
     fig = plt.figure(figsize=(10, 5))
+    ax1 = fig.add_subplot(111)
+    ax2 = ax1.twinx()
 
     t = np.linspace(0, 6000, 100)
-    plt.plot(t, Ppar_int.mean(axis=-1), label="Mean $\\int P_{\\parallel} \\text{d}t$")
-    plt.plot(t, Pperp_int.mean(axis=-1), label="Mean $\\int P_{\\perp} \\text{d}t$")
 
-    plt.yscale("log")
+    color1 = 'tab:red'
+    ax1.plot(t, Ppar_int.mean(axis=-1), color=color1)
+    ax1.tick_params(axis='y', labelcolor=color1)
+    ax1.set_ylabel("Mean $\\int P_{\\parallel} \\text{d}t$", color=color1)
+    ax1.set_xlabel("Time")
+
+    color2 = 'tab:blue'
+    ax2.plot(t, Pperp_int.mean(axis=-1), color=color2)
+    ax2.tick_params(axis='y', labelcolor=color2)
+    ax2.set_ylabel("Mean $\\int P_{\\perp} \\text{d}t$", color=color2)
 
     plt.title(f"Integrated power ({plot_identifier})")
-    plt.xlabel("Time")
-    plt.ylabel("Integrated power")
-    plt.legend()
+    # plt.xlabel("Time")
+    # plt.legend()
+    plt.grid(None)
     plt.show()
