@@ -38,6 +38,13 @@ if __name__ == "__main__":
     x_hist = np.load(f"{prefix}/x_hist.npy")
     print("Done.")
 
+    # print("Loading simulation data...")
+    # prefix = f"sim6"
+    # u_hist = np.load(f"{prefix}/u_hist.npy")
+    # x_hist = np.load(f"{prefix}/x_hist.npy")
+    # print("Done.")
+    # plot_identifier = "particle escape $\\tau=5$"
+
 
     # 0) plot the particle positions
     timestep = -1
@@ -63,8 +70,8 @@ if __name__ == "__main__":
     print(f"Mean order of magnitude of ratio: {ratio_order_mean} \\pm {ratio_order_spread}")
 
     print(f"Minimum energy (log): {np.log10(Ee.min())}, Maximum energy (log): {np.log10(Ee.max())}")
-    bins_edges = np.logspace(np.log10(Ee.min()), np.log10(Ee.max()), 20)
-    # bins_edges = np.logspace(np.log10(0.6), np.log10(8), 20) 
+    # bins_edges = np.logspace(np.log10(Ee.min()), np.log10(Ee.max()), 20)
+    bins_edges = np.logspace(np.log10(0.2), np.log10(2), 20) 
     bins = np.moveaxis(np.array([bins_edges[:-1], bins_edges[1:]]), 0, -1)
     bin_centers = 0.5 * (bins[:, 1] + bins[:, 0])
     averages = np.zeros(len(bins))
@@ -96,7 +103,7 @@ if __name__ == "__main__":
     plt.scatter(Ee, Pratio, s=1, alpha=0.05, c='blue')
     plt.plot(bin_centers, averages, ":", color="black", label="Average")
 
-    # plt.xlim(5, 1000)
+    plt.xlim(1e-2, 1e1)
     # plt.ylim(1e-7, 1e3)
 
     plt.title(f"Ratio of parallel to perpendicular power ({plot_identifier})")

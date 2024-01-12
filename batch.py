@@ -40,7 +40,7 @@ def run(gamma_syn: float,
 
     x_hist = np.zeros((saves, N, 3))
     u_hist = np.zeros((saves, N, 3))
-    for i, positions, velocities in sim.run(iterations, saves):
+    for i, positions, velocities in tqdm(sim.run(iterations, saves), total=saves):
         x_hist[i] = positions
         u_hist[i] = velocities
 
@@ -57,25 +57,26 @@ def main():
     gammas = [_ for _ in gammas if _[0] is None or _[1] is None]
 
     nstr = "1e5"
-    saves = 100
+    iterations = 1000
+    saves = iterations
     temp = 0.3
 
     N = int(float(nstr))
     N_THREADS = min(os.cpu_count()-2, len(gammas))
-    Parallel(n_jobs=N_THREADS)(
-        delayed(run)(
-            gamma_syn=g[0],
-            gamma_ic=g[1],
-            lifetime=None,
-            N=N,
-            temperature=temp,
-            saves=saves,
-            prefix="simulations",
-            name=f"M{nstr}-S{saves}-T{temp}-syn{g[0]}-ic{g[1]}",
-        ) for g in tqdm(gammas) # progress bar will be instantly full if N_THREADS >= len(gammas)
-    )
+    # Parallel(n_jobs=N_THREADS)(
+    #     delayed(run)(
+    #         gamma_syn=g[0],
+    #         gamma_ic=g[1],
+    #         lifetime=None,
+    #         N=N,
+    #         temperature=temp,
+    #         saves=saves,
+    #         prefix="simulations",
+    #         name=f"M{nstr}-S{saves}-T{temp}-syn{g[0]}-ic{g[1]}",
+    #     ) for g in tqdm(gammas) # progress bar will be instantly full if N_THREADS >= len(gammas)
+    # )
 
-    lifetimes = [1, 5]
+    lifetimes = [1, 5, 10]
 
     Parallel(n_jobs=N_THREADS)(
         delayed(run)(
@@ -84,6 +85,7 @@ def main():
             lifetime=tau,
             N=N,
             temperature=temp,
+            iterations=iterations,
             saves=saves,
             prefix="simulations",
             name=f"M{nstr}-S{saves}-T{temp}-tau{tau}",

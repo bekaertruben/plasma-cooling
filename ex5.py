@@ -22,7 +22,7 @@ if __name__ == "__main__":
     from matplotlib.lines import Line2D
     plt.style.use("ggplot")
 
-    gamma_syn = 3
+    gamma_syn = 20
     gamma_ic = None
     plot_identifier = f"$\\gamma_\\text{{syn}} = {gamma_syn}$, $\\gamma_\\text{{IC}} = {gamma_ic}$"
 
@@ -33,6 +33,12 @@ if __name__ == "__main__":
     x_hist = np.load(f"{prefix}/x_hist.npy")
     print("Done.")
 
+    # print("Loading simulation data...")
+    # prefix = f"sim6"
+    # u_hist = np.load(f"{prefix}/u_hist.npy")
+    # x_hist = np.load(f"{prefix}/x_hist.npy")
+    # print("Done.")
+    # plot_identifier = "particle escape $\\tau=5$"
 
     # 0) plot the particle positions
     # timestep = -1
